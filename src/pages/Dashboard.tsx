@@ -62,6 +62,7 @@ const Dashboard = () => {
   const [menuItems, setMenuItems] = useState<MenuItem[]>([]);
   const [showVoiceChat, setShowVoiceChat] = useState(false);
   const [showCart, setShowCart] = useState(false);
+  const [userId, setUserId] = useState<string | null>(null);
   const navigate = useNavigate();
   const { toast } = useToast();
 
@@ -77,6 +78,8 @@ const Dashboard = () => {
     const { data: { session } } = await supabase.auth.getSession();
     if (!session) {
       navigate("/auth");
+    } else {
+      setUserId(session.user.id);
     }
   };
 
@@ -131,17 +134,39 @@ const Dashboard = () => {
   };
 
   const addToCart = async (menuItem: MenuItem) => {
+    if (!userId) {
+      toast({
+        title: "Error",
+        description: "Please log in to add items to cart",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    // Check if item already exists in cart
+    const existingItem = cartItems.find(item => item.menu_item_id === menuItem.id);
+    
+    if (existingItem) {
+      await updateCartQuantity(existingItem.id, existingItem.quantity + 1);
+      toast({
+        title: "Updated cart!",
+        description: `${menuItem.name} quantity increased`,
+      });
+      return;
+    }
+
     const { error } = await supabase
       .from("cart")
-      .upsert({
+      .insert({
         menu_item_id: menuItem.id,
         quantity: 1,
+        user_id: userId,
       });
 
     if (error) {
       toast({
         title: "Error",
-        description: "Failed to add to cart",
+        description: error.message || "Failed to add to cart",
         variant: "destructive",
       });
     } else {
@@ -150,6 +175,38 @@ const Dashboard = () => {
         description: `${menuItem.name} has been added to your cart`,
       });
       fetchCart();
+    }
+  };
+
+  const addToWishlist = async (menuItem: MenuItem) => {
+    if (!userId) {
+      toast({
+        title: "Error",
+        description: "Please log in to add items to wishlist",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    const { error } = await supabase
+      .from("wishlist")
+      .insert({
+        menu_item_id: menuItem.id,
+        user_id: userId,
+      });
+
+    if (error) {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to add to wishlist",
+        variant: "destructive",
+      });
+    } else {
+      toast({
+        title: "Added to wishlist!",
+        description: `${menuItem.name} has been added to your wishlist`,
+      });
+      fetchWishlist();
     }
   };
 
@@ -349,10 +406,13 @@ const Dashboard = () => {
                   </CardTitle>
                   <CardDescription>{item.description}</CardDescription>
                 </CardHeader>
-                <CardContent>
-                  <Button onClick={() => addToCart(item)} className="w-full">
+                <CardContent className="flex gap-2">
+                  <Button onClick={() => addToCart(item)} className="flex-1">
                     <Plus className="w-4 h-4 mr-2" />
                     Add to Cart
+                  </Button>
+                  <Button onClick={() => addToWishlist(item)} variant="outline" size="icon">
+                    <Heart className="w-4 h-4" />
                   </Button>
                 </CardContent>
               </Card>

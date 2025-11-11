@@ -27,17 +27,14 @@ export const VoiceChat = () => {
       recognitionRef.current.continuous = false;
       recognitionRef.current.interimResults = false;
 
-      recognitionRef.current.onresult = (event: any) => {
-        const transcript = event.results[0][0].transcript;
-        setInputText(transcript);
-        handleSendMessage(transcript);
-      };
-
-      recognitionRef.current.onerror = () => {
+      recognitionRef.current.onerror = (event: any) => {
+        console.error("Speech recognition error:", event.error);
         setIsListening(false);
         toast({
           title: "Voice recognition error",
-          description: "Please try again or type your message",
+          description: event.error === "not-allowed" 
+            ? "Microphone access denied. Please enable it in your browser settings."
+            : "Please try again or type your message",
           variant: "destructive",
         });
       };
@@ -46,7 +43,13 @@ export const VoiceChat = () => {
         setIsListening(false);
       };
     }
-  }, []);
+
+    return () => {
+      if (recognitionRef.current) {
+        recognitionRef.current.stop();
+      }
+    };
+  }, [toast]);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -54,12 +57,28 @@ export const VoiceChat = () => {
 
   const startListening = () => {
     if (recognitionRef.current) {
-      setIsListening(true);
-      recognitionRef.current.start();
+      recognitionRef.current.onresult = (event: any) => {
+        const transcript = event.results[0][0].transcript;
+        setInputText(transcript);
+        handleSendMessage(transcript);
+      };
+      
+      try {
+        setIsListening(true);
+        recognitionRef.current.start();
+      } catch (error) {
+        console.error("Error starting recognition:", error);
+        setIsListening(false);
+        toast({
+          title: "Error",
+          description: "Could not start voice recognition. Please try again.",
+          variant: "destructive",
+        });
+      }
     } else {
       toast({
         title: "Voice not supported",
-        description: "Please type your message instead",
+        description: "Your browser doesn't support voice recognition. Please type your message instead.",
         variant: "destructive",
       });
     }
