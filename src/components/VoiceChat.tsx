@@ -17,6 +17,7 @@ export const VoiceChat = () => {
   const [isSpeaking, setIsSpeaking] = useState(false);
   const [voiceEnabled, setVoiceEnabled] = useState(true);
   const [inputText, setInputText] = useState("");
+  const [userId, setUserId] = useState<string | null>(null);
   const { toast } = useToast();
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const recognitionRef = useRef<any>(null);
@@ -47,12 +48,46 @@ export const VoiceChat = () => {
       };
     }
 
+    // Get current user
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (session) {
+        setUserId(session.user.id);
+        loadChatHistory(session.user.id);
+      }
+    });
+
     return () => {
       if (recognitionRef.current) {
         recognitionRef.current.stop();
       }
     };
   }, [toast]);
+
+  const loadChatHistory = async (uid: string) => {
+    const { data, error } = await supabase
+      .from("chat_messages")
+      .select("*")
+      .eq("user_id", uid)
+      .order("created_at", { ascending: true });
+
+    if (!error && data) {
+      const loadedMessages: Message[] = data.map(msg => ({
+        role: msg.role as "user" | "assistant",
+        content: msg.content,
+      }));
+      setMessages(loadedMessages);
+    }
+  };
+
+  const saveChatMessage = async (message: Message) => {
+    if (!userId) return;
+
+    await supabase.from("chat_messages").insert({
+      user_id: userId,
+      role: message.role,
+      content: message.content,
+    });
+  };
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -123,6 +158,7 @@ export const VoiceChat = () => {
 
     const userMessage: Message = { role: "user", content: messageText };
     setMessages((prev) => [...prev, userMessage]);
+    await saveChatMessage(userMessage);
     setInputText("");
     setIsProcessing(true);
 
@@ -141,6 +177,7 @@ export const VoiceChat = () => {
       };
       
       setMessages((prev) => [...prev, assistantMessage]);
+      await saveChatMessage(assistantMessage);
       speak(assistantMessage.content);
     } catch (error: any) {
       toast({

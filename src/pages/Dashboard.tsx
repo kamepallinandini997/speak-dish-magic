@@ -20,7 +20,11 @@ import {
   Plus,
   Minus,
   X,
-  CheckCircle
+  CheckCircle,
+  User,
+  Truck,
+  ChefHat,
+  MapPin
 } from "lucide-react";
 
 interface Restaurant {
@@ -261,65 +265,104 @@ const Dashboard = () => {
       0
     );
 
-    // Create order
-    const { data: order, error: orderError } = await supabase
-      .from("orders")
-      .insert({
-        user_id: userId,
-        restaurant_id: cartItems[0].menu_items.restaurant_id,
-        total_amount: totalAmount,
-        status: "confirmed",
-        payment_method: "pin",
-        delivery_address: "Default Address",
-      })
-      .select()
-      .single();
+    try {
+      // Create order
+      const { data: order, error: orderError } = await supabase
+        .from("orders")
+        .insert({
+          user_id: userId,
+          restaurant_id: cartItems[0].menu_items.restaurant_id,
+          total_amount: totalAmount,
+          status: "pending",
+          payment_method: "cash",
+          delivery_address: "Default Address",
+        })
+        .select()
+        .single();
 
-    if (orderError || !order) {
+      if (orderError || !order) {
+        console.error("Order error:", orderError);
+        toast({
+          title: "Error",
+          description: orderError?.message || "Failed to place order",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      // Create order items
+      const orderItems = cartItems.map(item => ({
+        order_id: order.id,
+        menu_item_id: item.menu_item_id,
+        quantity: item.quantity,
+        price: item.menu_items.price,
+        item_name: item.menu_items.name,
+      }));
+
+      const { error: itemsError } = await supabase
+        .from("order_items")
+        .insert(orderItems);
+
+      if (itemsError) {
+        console.error("Order items error:", itemsError);
+        toast({
+          title: "Error",
+          description: itemsError?.message || "Failed to create order items",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      // Clear cart
+      await supabase
+        .from("cart")
+        .delete()
+        .eq("user_id", userId);
+
+      toast({
+        title: "Order placed successfully!",
+        description: `Order #${order.id.slice(0, 8)} is being prepared. Total: $${totalAmount.toFixed(2)}`,
+      });
+
+      setShowCart(false);
+      fetchCart();
+      fetchOrders();
+    } catch (error: any) {
+      console.error("Checkout error:", error);
       toast({
         title: "Error",
-        description: "Failed to place order",
+        description: error.message || "Failed to complete checkout",
         variant: "destructive",
       });
-      return;
     }
+  };
 
-    // Create order items
-    const orderItems = cartItems.map(item => ({
-      order_id: order.id,
-      menu_item_id: item.menu_item_id,
-      quantity: item.quantity,
-      price: item.menu_items.price,
-      item_name: item.menu_items.name,
-    }));
-
-    const { error: itemsError } = await supabase
-      .from("order_items")
-      .insert(orderItems);
-
-    if (itemsError) {
-      toast({
-        title: "Error",
-        description: "Failed to create order items",
-        variant: "destructive",
-      });
-      return;
+  const getOrderStatusIcon = (status: string) => {
+    switch (status) {
+      case "pending":
+        return <Clock className="w-5 h-5 text-yellow-500" />;
+      case "confirmed":
+        return <CheckCircle className="w-5 h-5 text-blue-500" />;
+      case "preparing":
+        return <ChefHat className="w-5 h-5 text-orange-500" />;
+      case "delivering":
+        return <Truck className="w-5 h-5 text-purple-500" />;
+      case "delivered":
+        return <CheckCircle className="w-5 h-5 text-green-500" />;
+      default:
+        return <Package className="w-5 h-5" />;
     }
+  };
 
-    // Clear cart
-    await supabase
-      .from("cart")
-      .delete()
-      .eq("user_id", userId);
-
-    toast({
-      title: "Order placed!",
-      description: "Your order has been confirmed and is being prepared",
-    });
-
-    setShowCart(false);
-    fetchCart();
-    fetchOrders();
+  const getOrderStatusText = (status: string) => {
+    const statusMap: Record<string, string> = {
+      pending: "Order Received",
+      confirmed: "Order Confirmed",
+      preparing: "Being Prepared",
+      delivering: "Out for Delivery",
+      delivered: "Delivered",
+    };
+    return statusMap[status] || status;
   };
 
   const totalAmount = cartItems.reduce(
@@ -344,6 +387,15 @@ const Dashboard = () => {
             </div>
             
             <div className="flex items-center gap-3">
+              <Button
+                variant="outline"
+                size="icon"
+                onClick={() => navigate("/profile")}
+                title="Profile"
+              >
+                <User className="w-5 h-5" />
+              </Button>
+              
               <Button
                 variant="outline"
                 size="icon"
@@ -455,25 +507,94 @@ const Dashboard = () => {
 
           <TabsContent value="orders">
             <div className="space-y-4">
-              {orders.map((order) => (
-                <Card key={order.id}>
-                  <CardHeader>
-                    <CardTitle className="flex items-center justify-between">
-                      Order #{order.id.slice(0, 8)}
-                      <Badge>{order.status}</Badge>
-                    </CardTitle>
-                    <CardDescription>
-                      {new Date(order.created_at).toLocaleDateString()}
-                    </CardDescription>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="flex justify-between items-center">
-                      <span>Total: ₹{order.total_amount}</span>
-                      <span className="text-muted-foreground">{order.payment_method}</span>
-                    </div>
+              {orders.length === 0 ? (
+                <Card>
+                  <CardContent className="text-center py-12">
+                    <Package className="w-16 h-16 mx-auto mb-4 text-muted-foreground" />
+                    <p className="text-muted-foreground">No orders yet</p>
                   </CardContent>
                 </Card>
-              ))}
+              ) : (
+                orders.map((order) => (
+                  <Card key={order.id} className="overflow-hidden">
+                    <CardHeader>
+                      <div className="flex items-start justify-between">
+                        <div>
+                          <CardTitle className="flex items-center gap-2">
+                            Order #{order.id.slice(0, 8)}
+                            {getOrderStatusIcon(order.status)}
+                          </CardTitle>
+                          <CardDescription className="mt-1">
+                            {new Date(order.created_at).toLocaleDateString()} at{" "}
+                            {new Date(order.created_at).toLocaleTimeString()}
+                          </CardDescription>
+                        </div>
+                        <Badge variant={order.status === "delivered" ? "default" : "secondary"}>
+                          {getOrderStatusText(order.status)}
+                        </Badge>
+                      </div>
+                    </CardHeader>
+                    <CardContent className="space-y-4">
+                      {/* Order Progress Bar */}
+                      <div className="space-y-2">
+                        <div className="flex justify-between text-sm">
+                          <span className="text-muted-foreground">Order Progress</span>
+                          <span className="font-medium">
+                            {order.status === "pending" && "10%"}
+                            {order.status === "confirmed" && "30%"}
+                            {order.status === "preparing" && "60%"}
+                            {order.status === "delivering" && "85%"}
+                            {order.status === "delivered" && "100%"}
+                          </span>
+                        </div>
+                        <div className="w-full bg-muted rounded-full h-2">
+                          <div
+                            className={`h-2 rounded-full transition-all duration-500 ${
+                              order.status === "delivered" 
+                                ? "bg-green-500" 
+                                : "bg-gradient-hero"
+                            }`}
+                            style={{
+                              width:
+                                order.status === "pending"
+                                  ? "10%"
+                                  : order.status === "confirmed"
+                                  ? "30%"
+                                  : order.status === "preparing"
+                                  ? "60%"
+                                  : order.status === "delivering"
+                                  ? "85%"
+                                  : "100%",
+                            }}
+                          />
+                        </div>
+                      </div>
+
+                      {/* Order Details */}
+                      <div className="flex justify-between items-center pt-2 border-t border-border">
+                        <div className="space-y-1">
+                          <p className="text-sm text-muted-foreground">Total Amount</p>
+                          <p className="text-2xl font-bold">${order.total_amount.toFixed(2)}</p>
+                        </div>
+                        <div className="text-right space-y-1">
+                          <p className="text-sm text-muted-foreground">Payment</p>
+                          <p className="font-medium capitalize">{order.payment_method}</p>
+                        </div>
+                      </div>
+
+                      {order.delivery_address && (
+                        <div className="flex items-start gap-2 p-3 bg-muted/50 rounded-lg">
+                          <MapPin className="w-4 h-4 mt-1 text-muted-foreground" />
+                          <div>
+                            <p className="text-sm font-medium">Delivery Address</p>
+                            <p className="text-sm text-muted-foreground">{order.delivery_address}</p>
+                          </div>
+                        </div>
+                      )}
+                    </CardContent>
+                  </Card>
+                ))
+              )}
             </div>
           </TabsContent>
 
