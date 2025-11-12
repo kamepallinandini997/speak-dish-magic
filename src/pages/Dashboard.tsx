@@ -63,6 +63,7 @@ const Dashboard = () => {
   const [showVoiceChat, setShowVoiceChat] = useState(false);
   const [showCart, setShowCart] = useState(false);
   const [userId, setUserId] = useState<string | null>(null);
+  const [restaurantFilter, setRestaurantFilter] = useState("");
   const navigate = useNavigate();
   const { toast } = useToast();
 
@@ -210,6 +211,27 @@ const Dashboard = () => {
     }
   };
 
+  const removeFromWishlist = async (wishlistId: string, itemName: string) => {
+    const { error } = await supabase
+      .from("wishlist")
+      .delete()
+      .eq("id", wishlistId);
+
+    if (error) {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to remove from wishlist",
+        variant: "destructive",
+      });
+    } else {
+      toast({
+        title: "Removed from wishlist",
+        description: `${itemName} has been removed from your wishlist`,
+      });
+      fetchWishlist();
+    }
+  };
+
   const updateCartQuantity = async (cartId: string, newQuantity: number) => {
     if (newQuantity === 0) {
       await supabase.from("cart").delete().eq("id", cartId);
@@ -224,9 +246,90 @@ const Dashboard = () => {
     navigate("/");
   };
 
+  const handleCheckout = async () => {
+    if (!userId || cartItems.length === 0) {
+      toast({
+        title: "Error",
+        description: "Your cart is empty",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    const totalAmount = cartItems.reduce(
+      (sum, item) => sum + item.menu_items.price * item.quantity,
+      0
+    );
+
+    // Create order
+    const { data: order, error: orderError } = await supabase
+      .from("orders")
+      .insert({
+        user_id: userId,
+        restaurant_id: cartItems[0].menu_items.restaurant_id,
+        total_amount: totalAmount,
+        status: "confirmed",
+        payment_method: "pin",
+        delivery_address: "Default Address",
+      })
+      .select()
+      .single();
+
+    if (orderError || !order) {
+      toast({
+        title: "Error",
+        description: "Failed to place order",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    // Create order items
+    const orderItems = cartItems.map(item => ({
+      order_id: order.id,
+      menu_item_id: item.menu_item_id,
+      quantity: item.quantity,
+      price: item.menu_items.price,
+      item_name: item.menu_items.name,
+    }));
+
+    const { error: itemsError } = await supabase
+      .from("order_items")
+      .insert(orderItems);
+
+    if (itemsError) {
+      toast({
+        title: "Error",
+        description: "Failed to create order items",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    // Clear cart
+    await supabase
+      .from("cart")
+      .delete()
+      .eq("user_id", userId);
+
+    toast({
+      title: "Order placed!",
+      description: "Your order has been confirmed and is being prepared",
+    });
+
+    setShowCart(false);
+    fetchCart();
+    fetchOrders();
+  };
+
   const totalAmount = cartItems.reduce(
     (sum, item) => sum + item.menu_items.price * item.quantity,
     0
+  );
+
+  const filteredRestaurants = restaurants.filter(restaurant =>
+    restaurant.name.toLowerCase().includes(restaurantFilter.toLowerCase()) ||
+    restaurant.cuisine.toLowerCase().includes(restaurantFilter.toLowerCase())
   );
 
   return (
@@ -274,8 +377,17 @@ const Dashboard = () => {
           </TabsList>
 
           <TabsContent value="restaurants" className="space-y-6">
+            <div className="mb-4">
+              <input
+                type="text"
+                placeholder="Search restaurants by name or cuisine..."
+                value={restaurantFilter}
+                onChange={(e) => setRestaurantFilter(e.target.value)}
+                className="w-full px-4 py-2 border border-border rounded-lg bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
+              />
+            </div>
             <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {restaurants.map((restaurant) => (
+              {filteredRestaurants.map((restaurant) => (
                 <Card 
                   key={restaurant.id}
                   className="cursor-pointer hover:shadow-hover transition-all duration-300 hover:-translate-y-1 overflow-hidden"
@@ -324,9 +436,16 @@ const Dashboard = () => {
                     <CardTitle>{item.menu_items.name}</CardTitle>
                     <CardDescription>₹{item.menu_items.price}</CardDescription>
                   </CardHeader>
-                  <CardContent>
-                    <Button onClick={() => addToCart(item.menu_items)} className="w-full">
+                  <CardContent className="flex gap-2">
+                    <Button onClick={() => addToCart(item.menu_items)} className="flex-1">
                       Add to Cart
+                    </Button>
+                    <Button 
+                      onClick={() => removeFromWishlist(item.id, item.menu_items.name)} 
+                      variant="outline" 
+                      size="icon"
+                    >
+                      <X className="w-4 h-4" />
                     </Button>
                   </CardContent>
                 </Card>
@@ -465,9 +584,9 @@ const Dashboard = () => {
                   <span className="text-lg font-semibold">Total:</span>
                   <span className="text-2xl font-bold text-primary">₹{totalAmount.toFixed(2)}</span>
                 </div>
-                <Button className="w-full" size="lg">
+                <Button onClick={handleCheckout} className="w-full" size="lg">
                   <CheckCircle className="w-5 h-5 mr-2" />
-                  Proceed to Checkout
+                  Confirm Order
                 </Button>
               </>
             )}

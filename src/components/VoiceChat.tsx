@@ -14,10 +14,13 @@ export const VoiceChat = () => {
   const [messages, setMessages] = useState<Message[]>([]);
   const [isListening, setIsListening] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
+  const [isSpeaking, setIsSpeaking] = useState(false);
+  const [voiceEnabled, setVoiceEnabled] = useState(true);
   const [inputText, setInputText] = useState("");
   const { toast } = useToast();
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const recognitionRef = useRef<any>(null);
+  const utteranceRef = useRef<SpeechSynthesisUtterance | null>(null);
 
   useEffect(() => {
     // Initialize Web Speech API
@@ -55,8 +58,31 @@ export const VoiceChat = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
 
+  const stopSpeaking = () => {
+    if ('speechSynthesis' in window && window.speechSynthesis.speaking) {
+      window.speechSynthesis.cancel();
+      setIsSpeaking(false);
+    }
+  };
+
+  const speak = (text: string) => {
+    if ('speechSynthesis' in window && voiceEnabled) {
+      stopSpeaking();
+      const utterance = new SpeechSynthesisUtterance(text);
+      utterance.rate = 1.0;
+      utterance.pitch = 1.0;
+      utterance.onstart = () => setIsSpeaking(true);
+      utterance.onend = () => setIsSpeaking(false);
+      utteranceRef.current = utterance;
+      window.speechSynthesis.speak(utterance);
+    }
+  };
+
   const startListening = () => {
     if (recognitionRef.current) {
+      // Stop AI speaking when user starts speaking
+      stopSpeaking();
+      
       recognitionRef.current.onresult = (event: any) => {
         const transcript = event.results[0][0].transcript;
         setInputText(transcript);
@@ -115,14 +141,7 @@ export const VoiceChat = () => {
       };
       
       setMessages((prev) => [...prev, assistantMessage]);
-
-      // Text-to-speech
-      if ('speechSynthesis' in window) {
-        const utterance = new SpeechSynthesisUtterance(assistantMessage.content);
-        utterance.rate = 1.0;
-        utterance.pitch = 1.0;
-        window.speechSynthesis.speak(utterance);
-      }
+      speak(assistantMessage.content);
     } catch (error: any) {
       toast({
         title: "Error",
@@ -136,6 +155,21 @@ export const VoiceChat = () => {
 
   return (
     <div className="flex flex-col h-[600px] bg-card rounded-xl border border-border shadow-soft">
+      {/* Header with voice toggle */}
+      <div className="flex items-center justify-between p-4 border-b border-border">
+        <h3 className="font-semibold text-foreground">AI Food Assistant</h3>
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => {
+            setVoiceEnabled(!voiceEnabled);
+            if (voiceEnabled) stopSpeaking();
+          }}
+        >
+          {voiceEnabled ? "🔊 Voice On" : "🔇 Voice Off"}
+        </Button>
+      </div>
+
       {/* Messages */}
       <div className="flex-1 overflow-y-auto p-4 space-y-4">
         {messages.length === 0 && (

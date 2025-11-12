@@ -23,7 +23,19 @@ serve(async (req) => {
       throw new Error('LOVABLE_API_KEY is not configured');
     }
 
-    const systemPrompt = `You are a helpful AI food ordering assistant. You help users discover restaurants, understand menus, and place orders. 
+    // Check if user is asking to place an order
+    const lastUserMessage = messages.filter((m: Message) => m.role === 'user').slice(-1)[0]?.content || '';
+    const isOrderRequest = lastUserMessage.toLowerCase().includes('place') && 
+                          (lastUserMessage.toLowerCase().includes('order') || lastUserMessage.toLowerCase().includes('this'));
+    
+    // Count previous "place order" requests
+    const previousOrderRequests = messages.filter((m: Message) => 
+      m.role === 'user' && 
+      m.content.toLowerCase().includes('place') && 
+      (m.content.toLowerCase().includes('order') || m.content.toLowerCase().includes('this'))
+    ).length;
+
+    let systemPrompt = `You are a helpful AI food ordering assistant. You help users discover restaurants, understand menus, and place orders. 
 
 Your capabilities:
 - Help users find restaurants based on cuisine, rating, or preferences
@@ -42,6 +54,16 @@ Available restaurants:
 5. Sushi Palace (Japanese) - Rating 4.7, 35-45 mins delivery
 
 When users want to order, guide them through the process naturally.`;
+
+    if (isOrderRequest) {
+      if (previousOrderRequests === 1) {
+        // First time asking to place order
+        systemPrompt += '\n\nIMPORTANT: The user is asking to place an order for the FIRST time in this conversation. Ask them what they would like to order, which restaurant they prefer, and what items they want. Do not assume they have already discussed items.';
+      } else if (previousOrderRequests > 1) {
+        // Subsequent order requests
+        systemPrompt += '\n\nIMPORTANT: The user has already discussed their order details in previous messages. Summarize what they mentioned and help them complete the order by confirming the items and restaurant. Guide them to use the cart feature in the dashboard.';
+      }
+    }
 
     const response = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
       method: 'POST',
