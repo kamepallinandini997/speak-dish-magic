@@ -5,6 +5,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Textarea } from "@/components/ui/textarea";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { VoiceChat } from "@/components/VoiceChat";
@@ -66,6 +67,10 @@ const Dashboard = () => {
   const [menuItems, setMenuItems] = useState<MenuItem[]>([]);
   const [showVoiceChat, setShowVoiceChat] = useState(false);
   const [showCart, setShowCart] = useState(false);
+  const [showReview, setShowReview] = useState(false);
+  const [reviewOrder, setReviewOrder] = useState<any>(null);
+  const [reviewRating, setReviewRating] = useState(5);
+  const [reviewComment, setReviewComment] = useState("");
   const [userId, setUserId] = useState<string | null>(null);
   const [restaurantFilter, setRestaurantFilter] = useState("");
   const navigate = useNavigate();
@@ -78,6 +83,46 @@ const Dashboard = () => {
     fetchWishlist();
     fetchOrders();
   }, []);
+
+  useEffect(() => {
+    if (!userId) return;
+
+    // Subscribe to real-time order updates
+    const channel = supabase
+      .channel('user-orders')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'orders',
+          filter: `user_id=eq.${userId}`
+        },
+        (payload) => {
+          console.log('Order update:', payload);
+          fetchOrders();
+          
+          // Show notification for delivery
+          if (payload.new && (payload.new as any).status === 'delivering') {
+            const deliveryTime = new Date((payload.new as any).estimated_delivery_time);
+            const now = new Date();
+            const minutesLeft = Math.round((deliveryTime.getTime() - now.getTime()) / 60000);
+            
+            if (minutesLeft <= 5 && minutesLeft > 0) {
+              toast({
+                title: "Order arriving soon! 🚚",
+                description: `Your order will arrive in approximately ${minutesLeft} minutes`,
+              });
+            }
+          }
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [userId, toast]);
 
   const checkAuth = async () => {
     const { data: { session } } = await supabase.auth.getSession();
@@ -121,7 +166,11 @@ const Dashboard = () => {
       .select("*")
       .order("created_at", { ascending: false });
     
-    if (!error && data) setOrders(data);
+    if (!error && data) {
+      setOrders(data);
+    } else {
+      console.error("Error fetching orders:", error);
+    }
   };
 
   const fetchMenuItems = async (restaurantId: string) => {
@@ -365,6 +414,36 @@ const Dashboard = () => {
     return statusMap[status] || status;
   };
 
+  const submitReview = async () => {
+    if (!reviewOrder || !userId) return;
+
+    const { error } = await supabase
+      .from("order_reviews")
+      .insert({
+        order_id: reviewOrder.id,
+        user_id: userId,
+        rating: reviewRating,
+        comment: reviewComment,
+      });
+
+    if (error) {
+      toast({
+        title: "Error",
+        description: error.message,
+        variant: "destructive",
+      });
+    } else {
+      toast({
+        title: "Thank you!",
+        description: "Your review has been submitted",
+      });
+      setShowReview(false);
+      setReviewOrder(null);
+      setReviewRating(5);
+      setReviewComment("");
+    }
+  };
+
   const totalAmount = cartItems.reduce(
     (sum, item) => sum + item.menu_items.price * item.quantity,
     0
@@ -591,6 +670,20 @@ const Dashboard = () => {
                           </div>
                         </div>
                       )}
+
+                      {order.status === 'delivered' && (
+                        <Button 
+                          variant="outline" 
+                          className="w-full"
+                          onClick={() => {
+                            setReviewOrder(order);
+                            setShowReview(true);
+                          }}
+                        >
+                          <Star className="w-4 h-4 mr-2" />
+                          Rate Order
+                        </Button>
+                      )}
                     </CardContent>
                   </Card>
                 ))
@@ -715,6 +808,49 @@ const Dashboard = () => {
             {cartItems.length === 0 && (
               <p className="text-center text-muted-foreground py-8">Your cart is empty</p>
             )}
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Review Dialog */}
+      <Dialog open={showReview} onOpenChange={setShowReview}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Rate Your Order</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div>
+              <label className="text-sm font-medium mb-2 block">Rating</label>
+              <div className="flex gap-2">
+                {[1, 2, 3, 4, 5].map((star) => (
+                  <button
+                    key={star}
+                    onClick={() => setReviewRating(star)}
+                    className="focus:outline-none"
+                  >
+                    <Star
+                      className={`w-8 h-8 ${
+                        star <= reviewRating
+                          ? "fill-yellow-400 text-yellow-400"
+                          : "text-muted-foreground"
+                      }`}
+                    />
+                  </button>
+                ))}
+              </div>
+            </div>
+            <div>
+              <label className="text-sm font-medium mb-2 block">Comment (optional)</label>
+              <Textarea
+                placeholder="Share your experience..."
+                value={reviewComment}
+                onChange={(e) => setReviewComment(e.target.value)}
+                rows={4}
+              />
+            </div>
+            <Button onClick={submitReview} className="w-full">
+              Submit Review
+            </Button>
           </div>
         </DialogContent>
       </Dialog>

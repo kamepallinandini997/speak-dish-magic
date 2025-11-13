@@ -55,6 +55,7 @@ export type Database = {
           created_at: string | null
           id: string
           role: string
+          session_id: string | null
           user_id: string | null
         }
         Insert: {
@@ -62,6 +63,7 @@ export type Database = {
           created_at?: string | null
           id?: string
           role: string
+          session_id?: string | null
           user_id?: string | null
         }
         Update: {
@@ -69,7 +71,37 @@ export type Database = {
           created_at?: string | null
           id?: string
           role?: string
+          session_id?: string | null
           user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "chat_messages_session_id_fkey"
+            columns: ["session_id"]
+            isOneToOne: false
+            referencedRelation: "chat_sessions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      chat_sessions: {
+        Row: {
+          created_at: string | null
+          id: string
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          updated_at?: string | null
+          user_id: string
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          updated_at?: string | null
+          user_id?: string
         }
         Relationships: []
       }
@@ -168,10 +200,46 @@ export type Database = {
           },
         ]
       }
+      order_reviews: {
+        Row: {
+          comment: string | null
+          created_at: string | null
+          id: string
+          order_id: string
+          rating: number
+          user_id: string
+        }
+        Insert: {
+          comment?: string | null
+          created_at?: string | null
+          id?: string
+          order_id: string
+          rating: number
+          user_id: string
+        }
+        Update: {
+          comment?: string | null
+          created_at?: string | null
+          id?: string
+          order_id?: string
+          rating?: number
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "order_reviews_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: true
+            referencedRelation: "orders"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       orders: {
         Row: {
           created_at: string | null
           delivery_address: string | null
+          estimated_delivery_time: string | null
           id: string
           payment_method: string | null
           restaurant_id: string | null
@@ -183,6 +251,7 @@ export type Database = {
         Insert: {
           created_at?: string | null
           delivery_address?: string | null
+          estimated_delivery_time?: string | null
           id?: string
           payment_method?: string | null
           restaurant_id?: string | null
@@ -194,6 +263,7 @@ export type Database = {
         Update: {
           created_at?: string | null
           delivery_address?: string | null
+          estimated_delivery_time?: string | null
           id?: string
           payment_method?: string | null
           restaurant_id?: string | null
@@ -275,6 +345,38 @@ export type Database = {
         }
         Relationships: []
       }
+      user_roles: {
+        Row: {
+          created_at: string | null
+          id: string
+          restaurant_id: string | null
+          role: Database["public"]["Enums"]["app_role"]
+          user_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          restaurant_id?: string | null
+          role: Database["public"]["Enums"]["app_role"]
+          user_id: string
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          restaurant_id?: string | null
+          role?: Database["public"]["Enums"]["app_role"]
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "user_roles_restaurant_id_fkey"
+            columns: ["restaurant_id"]
+            isOneToOne: false
+            referencedRelation: "restaurants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       wishlist: {
         Row: {
           created_at: string | null
@@ -309,10 +411,16 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      has_role: {
+        Args: {
+          _role: Database["public"]["Enums"]["app_role"]
+          _user_id: string
+        }
+        Returns: boolean
+      }
     }
     Enums: {
-      [_ in never]: never
+      app_role: "admin" | "restaurant_owner" | "user"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -439,6 +547,8 @@ export type CompositeTypes<
 
 export const Constants = {
   public: {
-    Enums: {},
+    Enums: {
+      app_role: ["admin", "restaurant_owner", "user"],
+    },
   },
 } as const

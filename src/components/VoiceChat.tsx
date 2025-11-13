@@ -4,6 +4,8 @@ import { Mic, MicOff, Send, Volume2, Loader2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { Textarea } from "@/components/ui/textarea";
+import { Input } from "@/components/ui/input";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 interface Message {
   role: "user" | "assistant";
@@ -18,6 +20,9 @@ export const VoiceChat = () => {
   const [voiceEnabled, setVoiceEnabled] = useState(true);
   const [inputText, setInputText] = useState("");
   const [userId, setUserId] = useState<string | null>(null);
+  const [sessionId, setSessionId] = useState<string | null>(null);
+  const [showCheckout, setShowCheckout] = useState(false);
+  const [checkoutData, setCheckoutData] = useState<any>(null);
   const { toast } = useToast();
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const recognitionRef = useRef<any>(null);
@@ -48,11 +53,11 @@ export const VoiceChat = () => {
       };
     }
 
-    // Get current user
-    supabase.auth.getSession().then(({ data: { session } }) => {
+    // Get current user and create new session
+    supabase.auth.getSession().then(async ({ data: { session } }) => {
       if (session) {
         setUserId(session.user.id);
-        loadChatHistory(session.user.id);
+        await createNewSession(session.user.id);
       }
     });
 
@@ -63,11 +68,23 @@ export const VoiceChat = () => {
     };
   }, [toast]);
 
-  const loadChatHistory = async (uid: string) => {
+  const createNewSession = async (uid: string) => {
+    const { data, error } = await supabase
+      .from("chat_sessions")
+      .insert({ user_id: uid })
+      .select()
+      .single();
+
+    if (!error && data) {
+      setSessionId(data.id);
+    }
+  };
+
+  const loadChatHistory = async (sid: string) => {
     const { data, error } = await supabase
       .from("chat_messages")
       .select("*")
-      .eq("user_id", uid)
+      .eq("session_id", sid)
       .order("created_at", { ascending: true });
 
     if (!error && data) {
@@ -80,10 +97,11 @@ export const VoiceChat = () => {
   };
 
   const saveChatMessage = async (message: Message) => {
-    if (!userId) return;
+    if (!userId || !sessionId) return;
 
     await supabase.from("chat_messages").insert({
       user_id: userId,
+      session_id: sessionId,
       role: message.role,
       content: message.content,
     });
@@ -179,6 +197,13 @@ export const VoiceChat = () => {
       setMessages((prev) => [...prev, assistantMessage]);
       await saveChatMessage(assistantMessage);
       speak(assistantMessage.content);
+
+      // Check if AI wants to proceed to checkout
+      if (data.response?.toLowerCase().includes("proceed to checkout") || 
+          data.response?.toLowerCase().includes("ready to order")) {
+        setCheckoutData({ total: 0 }); // Will be calculated from cart
+        setShowCheckout(true);
+      }
     } catch (error: any) {
       toast({
         title: "Error",
@@ -190,8 +215,46 @@ export const VoiceChat = () => {
     }
   };
 
+  const handleMockCheckout = () => {
+    toast({
+      title: "Order Confirmed! 🎉",
+      description: "Your order has been placed successfully. You'll receive updates on your order status.",
+    });
+    setShowCheckout(false);
+  };
+
   return (
-    <div className="flex flex-col h-[600px] bg-card rounded-xl border border-border shadow-soft">
+    <>
+      {showCheckout && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-card rounded-xl p-6 max-w-md w-full space-y-4">
+            <h3 className="text-xl font-bold">Complete Your Order</h3>
+            <div className="space-y-2">
+              <Input placeholder="Delivery Address" />
+              <Select>
+                <SelectTrigger>
+                  <SelectValue placeholder="Payment Method" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="cash">Cash on Delivery</SelectItem>
+                  <SelectItem value="card">Card</SelectItem>
+                  <SelectItem value="upi">UPI</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="flex gap-2">
+              <Button onClick={handleMockCheckout} className="flex-1">
+                Place Order
+              </Button>
+              <Button variant="outline" onClick={() => setShowCheckout(false)}>
+                Cancel
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+      
+      <div className="flex flex-col h-[600px] bg-card rounded-xl border border-border shadow-soft">
       {/* Header with voice toggle */}
       <div className="flex items-center justify-between p-4 border-b border-border">
         <h3 className="font-semibold text-foreground">AI Food Assistant</h3>
@@ -283,5 +346,6 @@ export const VoiceChat = () => {
         </div>
       </div>
     </div>
+    </>
   );
 };
