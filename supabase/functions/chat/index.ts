@@ -17,6 +17,25 @@ serve(async (req) => {
 
   try {
     const { messages } = await req.json();
+    
+    // Input validation
+    if (!Array.isArray(messages)) {
+      throw new Error('Invalid messages format');
+    }
+    
+    if (messages.length > 50) {
+      throw new Error('Too many messages');
+    }
+    
+    for (const msg of messages) {
+      if (!msg.role || !msg.content || typeof msg.content !== 'string') {
+        throw new Error('Invalid message structure');
+      }
+      if (msg.content.length > 2000) {
+        throw new Error('Message content too long');
+      }
+    }
+    
     const LOVABLE_API_KEY = Deno.env.get('LOVABLE_API_KEY');
     
     if (!LOVABLE_API_KEY) {
@@ -96,10 +115,14 @@ When users want to order, guide them through the process naturally.`;
       }
     );
   } catch (error) {
-    console.error('Chat error:', error);
+    console.error('Chat error details:', {
+      error: error instanceof Error ? error.message : 'Unknown',
+      stack: error instanceof Error ? error.stack : undefined
+    });
+    
     return new Response(
       JSON.stringify({ 
-        error: error instanceof Error ? error.message : 'Unknown error' 
+        error: 'Unable to process your message. Please try again.' 
       }),
       { 
         status: 500,
