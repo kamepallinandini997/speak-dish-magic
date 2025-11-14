@@ -121,7 +121,24 @@ export const VoiceChat = () => {
   const speak = (text: string) => {
     if ('speechSynthesis' in window && voiceEnabled) {
       stopSpeaking();
-      const utterance = new SpeechSynthesisUtterance(text);
+      
+      // Clean text from special symbols and emojis for TTS
+      const cleanText = text
+        .replace(/[*_~`#\[\](){}]/g, '') // Remove markdown symbols
+        .replace(/[\u{1F600}-\u{1F64F}]/gu, '') // Remove emoticons
+        .replace(/[\u{1F300}-\u{1F5FF}]/gu, '') // Remove misc symbols & pictographs
+        .replace(/[\u{1F680}-\u{1F6FF}]/gu, '') // Remove transport & map symbols
+        .replace(/[\u{1F1E0}-\u{1F1FF}]/gu, '') // Remove flags
+        .replace(/[\u{2600}-\u{26FF}]/gu, '')   // Remove misc symbols
+        .replace(/[\u{2700}-\u{27BF}]/gu, '')   // Remove dingbats
+        .replace(/[\u{FE00}-\u{FE0F}]/gu, '')   // Remove variation selectors
+        .replace(/[\u{1F900}-\u{1F9FF}]/gu, '') // Remove supplemental symbols
+        .replace(/[\u{1FA00}-\u{1FA6F}]/gu, '') // Remove chess & cards
+        .replace(/[\u{1FA70}-\u{1FAFF}]/gu, '') // Remove extended pictographs
+        .replace(/\s+/g, ' ')                    // Normalize whitespace
+        .trim();
+      
+      const utterance = new SpeechSynthesisUtterance(cleanText);
       utterance.rate = 1.0;
       utterance.pitch = 1.0;
       utterance.onstart = () => setIsSpeaking(true);
