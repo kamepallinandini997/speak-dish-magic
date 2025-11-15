@@ -6,16 +6,26 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
-import { Sparkles, Loader2 } from "lucide-react";
+import { Sparkles, Loader2, Store, User } from "lucide-react";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 const Auth = () => {
   const [searchParams] = useSearchParams();
   const [mode, setMode] = useState<"login" | "signup">(
     searchParams.get("mode") === "signup" ? "signup" : "login"
   );
+  const [userType, setUserType] = useState<"customer" | "restaurant_owner">(
+    searchParams.get("type") === "business" ? "restaurant_owner" : "customer"
+  );
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [fullName, setFullName] = useState("");
+  
+  // Restaurant owner fields
+  const [restaurantName, setRestaurantName] = useState("");
+  const [cuisine, setCuisine] = useState("");
+  const [deliveryTime, setDeliveryTime] = useState("30-40 mins");
+  
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
   const { toast } = useToast();
@@ -35,7 +45,8 @@ const Auth = () => {
 
     try {
       if (mode === "signup") {
-        const { error } = await supabase.auth.signUp({
+        // First create the auth user
+        const { data: authData, error: authError } = await supabase.auth.signUp({
           email,
           password,
           options: {
@@ -46,12 +57,49 @@ const Auth = () => {
           },
         });
 
-        if (error) throw error;
+        if (authError) throw authError;
+        if (!authData.user) throw new Error("User creation failed");
 
-        toast({
-          title: "Account created!",
-          description: "You can now start ordering.",
-        });
+        // For restaurant owners, create restaurant and assign role
+        if (userType === "restaurant_owner") {
+          // Create the restaurant
+          const { data: restaurant, error: restaurantError } = await supabase
+            .from("restaurants")
+            .insert({
+              name: restaurantName,
+              cuisine: cuisine,
+              delivery_time: deliveryTime,
+              rating: 4.0,
+              min_order: 0,
+              delivery_fee: 0,
+            })
+            .select()
+            .single();
+
+          if (restaurantError) throw restaurantError;
+
+          // Assign restaurant_owner role
+          const { error: roleError } = await supabase
+            .from("user_roles")
+            .insert({
+              user_id: authData.user.id,
+              role: "restaurant_owner",
+              restaurant_id: restaurant.id,
+            });
+
+          if (roleError) throw roleError;
+
+          toast({
+            title: "Restaurant created!",
+            description: "Your business account is ready. You can now manage your restaurant.",
+          });
+        } else {
+          toast({
+            title: "Account created!",
+            description: "You can now start ordering.",
+          });
+        }
+        
         navigate("/dashboard");
       } else {
         const { error } = await supabase.auth.signInWithPassword({
@@ -90,12 +138,27 @@ const Auth = () => {
           </CardTitle>
           <CardDescription>
             {mode === "login" 
-              ? "Sign in to continue ordering delicious food" 
-              : "Create an account to start ordering"}
+              ? "Sign in to continue" 
+              : "Create an account to get started"}
           </CardDescription>
         </CardHeader>
         <CardContent>
           <form onSubmit={handleAuth} className="space-y-4">
+            {mode === "signup" && (
+              <Tabs value={userType} onValueChange={(v) => setUserType(v as any)} className="w-full">
+                <TabsList className="grid w-full grid-cols-2">
+                  <TabsTrigger value="customer" className="gap-2">
+                    <User className="w-4 h-4" />
+                    Customer
+                  </TabsTrigger>
+                  <TabsTrigger value="restaurant_owner" className="gap-2">
+                    <Store className="w-4 h-4" />
+                    Business Owner
+                  </TabsTrigger>
+                </TabsList>
+              </Tabs>
+            )}
+
             {mode === "signup" && (
               <div className="space-y-2">
                 <Label htmlFor="fullName">Full Name</Label>
@@ -108,6 +171,46 @@ const Auth = () => {
                   required={mode === "signup"}
                 />
               </div>
+            )}
+
+            {mode === "signup" && userType === "restaurant_owner" && (
+              <>
+                <div className="space-y-2">
+                  <Label htmlFor="restaurantName">Restaurant Name</Label>
+                  <Input
+                    id="restaurantName"
+                    type="text"
+                    placeholder="Paradise Biryani"
+                    value={restaurantName}
+                    onChange={(e) => setRestaurantName(e.target.value)}
+                    required
+                  />
+                </div>
+                
+                <div className="space-y-2">
+                  <Label htmlFor="cuisine">Cuisine Type</Label>
+                  <Input
+                    id="cuisine"
+                    type="text"
+                    placeholder="Indian, Chinese, Italian..."
+                    value={cuisine}
+                    onChange={(e) => setCuisine(e.target.value)}
+                    required
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="deliveryTime">Estimated Delivery Time</Label>
+                  <Input
+                    id="deliveryTime"
+                    type="text"
+                    placeholder="30-40 mins"
+                    value={deliveryTime}
+                    onChange={(e) => setDeliveryTime(e.target.value)}
+                    required
+                  />
+                </div>
+              </>
             )}
             
             <div className="space-y-2">
