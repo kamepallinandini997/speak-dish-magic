@@ -12,7 +12,11 @@ interface Message {
   content: string;
 }
 
-export const VoiceChat = () => {
+interface VoiceChatProps {
+  isActive: boolean;
+}
+
+export const VoiceChat = ({ isActive }: VoiceChatProps) => {
   const [messages, setMessages] = useState<Message[]>([]);
   const [isListening, setIsListening] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
@@ -67,6 +71,16 @@ export const VoiceChat = () => {
       }
     };
   }, [toast]);
+
+  // Stop voice when tab changes
+  useEffect(() => {
+    if (!isActive) {
+      stopSpeaking();
+      if (isListening) {
+        stopListening();
+      }
+    }
+  }, [isActive, isListening]);
 
   const createNewSession = async (uid: string) => {
     const { data, error } = await supabase
