@@ -1,5 +1,5 @@
 import { Button } from "@/components/ui/button";
-import { Mic, ShoppingCart, CreditCard, Truck, ArrowRight, Sparkles } from "lucide-react";
+import { Mic, ShoppingCart, CreditCard, Truck, ArrowRight, Sparkles, Store } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 
 const Landing = () => {
@@ -132,21 +132,94 @@ const Landing = () => {
 
       {/* CTA Section */}
       <section className="container mx-auto px-4 py-20">
-        <div className="bg-gradient-hero rounded-3xl p-12 text-center text-primary-foreground shadow-hover">
-          <h3 className="text-3xl md:text-4xl font-bold mb-4">
-            Ready to Try It Out?
+        <div className="bg-gradient-to-r from-primary/10 via-primary/5 to-background rounded-3xl p-12 text-center shadow-hover">
+          <h3 className="text-4xl font-bold mb-4">
+            Ready to Order Smarter?
           </h3>
-          <p className="text-lg mb-8 opacity-90">
-            Join thousands of users enjoying voice-powered food ordering
+          <p className="text-xl text-muted-foreground mb-8 max-w-2xl mx-auto">
+            Join thousands of users who are already experiencing the future of food delivery
           </p>
-          <Button 
-            size="lg" 
-            variant="secondary"
-            onClick={() => navigate("/auth?mode=signup")}
-            className="gap-2"
-          >
+          <Button size="lg" onClick={() => navigate("/auth?mode=signup")} className="gap-2 shadow-hover">
             Start Ordering Now <ArrowRight className="w-4 h-4" />
           </Button>
+        </div>
+      </section>
+
+      {/* Business Owner CTA Section */}
+      <section className="container mx-auto px-4 py-20">
+        <div className="bg-gradient-to-br from-background to-muted/30 rounded-3xl p-12 border border-border shadow-elegant">
+          <div className="grid md:grid-cols-2 gap-12 items-center">
+            <div className="space-y-6">
+              <div className="inline-block">
+                <span className="px-4 py-2 rounded-full bg-primary/10 text-primary text-sm font-medium">
+                  🏪 For Business Owners
+                </span>
+              </div>
+              <h3 className="text-4xl font-bold">
+                Grow Your Restaurant Business With Us
+              </h3>
+              <p className="text-lg text-muted-foreground">
+                Join our platform and reach thousands of hungry customers. Manage your menu, 
+                track orders, and grow your business - all in one place.
+              </p>
+              <ul className="space-y-3">
+                <li className="flex items-start gap-3">
+                  <div className="rounded-full bg-primary/10 p-1 mt-0.5">
+                    <Sparkles className="w-4 h-4 text-primary" />
+                  </div>
+                  <div>
+                    <div className="font-semibold">Easy Menu Management</div>
+                    <div className="text-sm text-muted-foreground">Add and update your dishes in real-time</div>
+                  </div>
+                </li>
+                <li className="flex items-start gap-3">
+                  <div className="rounded-full bg-primary/10 p-1 mt-0.5">
+                    <Sparkles className="w-4 h-4 text-primary" />
+                  </div>
+                  <div>
+                    <div className="font-semibold">Order Analytics</div>
+                    <div className="text-sm text-muted-foreground">Track your sales and customer preferences</div>
+                  </div>
+                </li>
+                <li className="flex items-start gap-3">
+                  <div className="rounded-full bg-primary/10 p-1 mt-0.5">
+                    <Sparkles className="w-4 h-4 text-primary" />
+                  </div>
+                  <div>
+                    <div className="font-semibold">Instant Notifications</div>
+                    <div className="text-sm text-muted-foreground">Get notified for every new order</div>
+                  </div>
+                </li>
+              </ul>
+            </div>
+            <div className="space-y-4">
+              <div className="bg-card p-8 rounded-2xl border border-border shadow-hover">
+                <div className="text-center space-y-4">
+                  <Store className="w-16 h-16 text-primary mx-auto" />
+                  <h4 className="text-2xl font-bold">Start Your Business Journey</h4>
+                  <p className="text-muted-foreground">
+                    Sign up as a restaurant owner and start accepting orders today
+                  </p>
+                  <Button 
+                    size="lg" 
+                    onClick={() => navigate("/auth?mode=signup&type=business")} 
+                    className="w-full gap-2"
+                  >
+                    Register Your Restaurant <ArrowRight className="w-4 h-4" />
+                  </Button>
+                  <p className="text-xs text-muted-foreground">
+                    Already have an account?{" "}
+                    <button 
+                      onClick={() => navigate("/auth?mode=login")}
+                      className="text-primary hover:underline"
+                    >
+                      Sign in
+                    </button>
+                  </p>
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
       </section>
 
