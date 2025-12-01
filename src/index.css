@@ -44,6 +44,7 @@ All colors MUST be HSL.
     
     --shadow-soft: 0 4px 20px -4px hsl(14 86% 58% / 0.15);
     --shadow-hover: 0 8px 30px -6px hsl(14 86% 58% / 0.25);
+    --shadow-chip: 0 4px 12px -2px hsl(14 86% 58% / 0.3);
     
     --transition-smooth: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 

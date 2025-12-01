@@ -66,6 +66,7 @@ export default {
       boxShadow: {
         'soft': 'var(--shadow-soft)',
         'hover': 'var(--shadow-hover)',
+        'chip': 'var(--shadow-chip)',
       },
       transitionProperty: {
         'smooth': 'var(--transition-smooth)',
@@ -92,10 +93,28 @@ export default {
             height: "0",
           },
         },
+        "zoom-in": {
+          "0%": {
+            transform: "scale(1)",
+          },
+          "100%": {
+            transform: "scale(1.08)",
+          },
+        },
+        "shimmer": {
+          "0%": {
+            backgroundPosition: "-1000px 0",
+          },
+          "100%": {
+            backgroundPosition: "1000px 0",
+          },
+        },
       },
       animation: {
         "accordion-down": "accordion-down 0.2s ease-out",
         "accordion-up": "accordion-up 0.2s ease-out",
+        "zoom-in": "zoom-in 0.3s ease-out",
+        "shimmer": "shimmer 2s infinite linear",
       },
     },
   },
