@@ -457,11 +457,16 @@ const RestaurantDashboard = () => {
                 <Card key={item.id}>
                   <CardHeader>
                     {item.image_url && (
-                      <img 
-                        src={item.image_url} 
-                        alt={item.name}
-                        className="w-full h-40 object-cover rounded-lg mb-3"
-                      />
+                      <div className="relative h-48 overflow-hidden rounded-lg mb-3 bg-muted">
+                        <img 
+                          src={item.image_url || "https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=400"} 
+                          alt={item.name}
+                          className="w-full h-full object-cover hover:scale-110 transition-transform duration-300"
+                          onError={(e) => {
+                            e.currentTarget.src = "https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=400";
+                          }}
+                        />
+                      </div>
                     )}
                     <div className="flex items-start justify-between">
                       <div className="flex-1">
