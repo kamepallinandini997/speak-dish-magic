@@ -85,6 +85,7 @@ const Dashboard = () => {
   const [userId, setUserId] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedCategory, setSelectedCategory] = useState("All");
+  const [selectedVegFilter, setSelectedVegFilter] = useState<"all" | "veg" | "non-veg">("all");
   const [deliveryAddress, setDeliveryAddress] = useState("123 Main St, City");
   const [paymentMethod, setPaymentMethod] = useState("cash");
   const [loading, setLoading] = useState(true);
@@ -373,7 +374,11 @@ const Dashboard = () => {
   const filteredMenuItems = menuItems.filter(item => {
     const matchesCategory = selectedCategory === "All" || item.category === selectedCategory;
     const matchesSearch = item.name.toLowerCase().includes(searchQuery.toLowerCase());
-    return matchesCategory && matchesSearch;
+    const matchesVegFilter = 
+      selectedVegFilter === "all" ? true :
+      selectedVegFilter === "veg" ? item.is_vegetarian :
+      !item.is_vegetarian;
+    return matchesCategory && matchesSearch && matchesVegFilter;
   });
 
   const searchSuggestions = searchQuery.length > 0 
@@ -481,27 +486,6 @@ const Dashboard = () => {
                 </Card>
               )}
             </div>
-
-            {/* Category Filter Chips */}
-            <ScrollArea className="mb-6">
-              <div className="flex gap-2 pb-2">
-                {categories.map((cat) => (
-                  <Button
-                    key={cat}
-                    variant={selectedCategory === cat ? "default" : "outline"}
-                    size="sm"
-                    onClick={() => setSelectedCategory(cat)}
-                    className={`whitespace-nowrap transition-all ${
-                      selectedCategory === cat 
-                        ? "shadow-chip font-bold scale-105" 
-                        : "hover:shadow-soft"
-                    }`}
-                  >
-                    {cat}
-                  </Button>
-                ))}
-              </div>
-            </ScrollArea>
 
             {/* Bottom Navigation Tabs */}
             <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
@@ -759,26 +743,83 @@ const Dashboard = () => {
               </CardContent>
             </Card>
 
-            {/* Category Filter for Menu */}
-            <ScrollArea className="mb-6">
-              <div className="flex gap-2 pb-2">
-                {categories.map((cat) => (
-                  <Button
-                    key={cat}
-                    variant={selectedCategory === cat ? "default" : "outline"}
-                    size="sm"
-                    onClick={() => setSelectedCategory(cat)}
-                    className={`whitespace-nowrap transition-all ${
-                      selectedCategory === cat 
-                        ? "shadow-chip font-bold scale-105" 
-                        : "hover:shadow-soft"
-                    }`}
-                  >
-                    {cat}
-                  </Button>
-                ))}
-              </div>
-            </ScrollArea>
+            {/* Filters: Category + Veg/Non-Veg */}
+            <Card className="mb-6 shadow-soft">
+              <CardContent className="p-4">
+                <div className="flex items-center gap-2 mb-3">
+                  <Filter className="h-4 w-4 text-muted-foreground" />
+                  <span className="text-sm font-medium">Filters</span>
+                </div>
+                
+                {/* Category Filters */}
+                <div className="mb-4">
+                  <p className="text-xs text-muted-foreground mb-2">Category</p>
+                  <ScrollArea className="w-full">
+                    <div className="flex gap-2 pb-2">
+                      {categories.map((cat) => (
+                        <Button
+                          key={cat}
+                          variant={selectedCategory === cat ? "default" : "outline"}
+                          size="sm"
+                          onClick={() => setSelectedCategory(cat)}
+                          className={`whitespace-nowrap transition-all ${
+                            selectedCategory === cat 
+                              ? "shadow-chip font-bold scale-105" 
+                              : "hover:shadow-soft"
+                          }`}
+                        >
+                          {cat}
+                        </Button>
+                      ))}
+                    </div>
+                  </ScrollArea>
+                </div>
+
+                {/* Veg/Non-Veg Filters */}
+                <div>
+                  <p className="text-xs text-muted-foreground mb-2">Dietary Preference</p>
+                  <div className="flex gap-2">
+                    <Button
+                      variant={selectedVegFilter === "all" ? "default" : "outline"}
+                      size="sm"
+                      onClick={() => setSelectedVegFilter("all")}
+                      className={`transition-all ${
+                        selectedVegFilter === "all" 
+                          ? "shadow-chip font-bold" 
+                          : "hover:shadow-soft"
+                      }`}
+                    >
+                      All
+                    </Button>
+                    <Button
+                      variant={selectedVegFilter === "veg" ? "default" : "outline"}
+                      size="sm"
+                      onClick={() => setSelectedVegFilter("veg")}
+                      className={`transition-all ${
+                        selectedVegFilter === "veg" 
+                          ? "shadow-chip font-bold" 
+                          : "hover:shadow-soft"
+                      }`}
+                    >
+                      <Leaf className="h-3 w-3 mr-1 text-secondary" />
+                      Veg
+                    </Button>
+                    <Button
+                      variant={selectedVegFilter === "non-veg" ? "default" : "outline"}
+                      size="sm"
+                      onClick={() => setSelectedVegFilter("non-veg")}
+                      className={`transition-all ${
+                        selectedVegFilter === "non-veg" 
+                          ? "shadow-chip font-bold" 
+                          : "hover:shadow-soft"
+                      }`}
+                    >
+                      Non-Veg
+                    </Button>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
 
             <div className="space-y-4">
               {filteredMenuItems.map((item) => (
