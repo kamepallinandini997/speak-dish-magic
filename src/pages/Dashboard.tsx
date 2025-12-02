@@ -544,11 +544,11 @@ const Dashboard = () => {
                   </div>
                 ) : (
                   <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-                     {filteredRestaurants.map((restaurant) => (
+                    {filteredRestaurants.map((restaurant) => (
                       <Card 
                         key={restaurant.id}
                         className="group cursor-pointer hover:shadow-hover transition-all duration-300 overflow-hidden"
-                        onClick={() => navigate(`/restaurant/${restaurant.id}`)}
+                        onClick={() => handleRestaurantClick(restaurant)}
                       >
                         <div className="relative overflow-hidden rounded-t-lg h-48">
                           <img 
