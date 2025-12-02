@@ -534,11 +534,14 @@ const Dashboard = () => {
                         className="group cursor-pointer hover:shadow-hover transition-all duration-300 overflow-hidden"
                         onClick={() => handleRestaurantClick(restaurant)}
                       >
-                        <div className="relative overflow-hidden rounded-t-lg h-48">
+                        <div className="relative overflow-hidden rounded-t-lg h-48 bg-muted">
                           <img 
-                            src={restaurant.image_url} 
+                            src={restaurant.image_url || "https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?w=400"} 
                             alt={restaurant.name}
                             className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
+                            onError={(e) => {
+                              e.currentTarget.src = "https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?w=400";
+                            }}
                           />
                           {/* Rating Badge - Top Left */}
                           <Badge className="absolute top-3 left-3 bg-background/95 backdrop-blur shadow-soft">
@@ -608,11 +611,14 @@ const Dashboard = () => {
                   <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
                     {wishlistItems.map((item) => (
                       <Card key={item.id} className="group hover:shadow-hover transition-all">
-                        <div className="relative overflow-hidden rounded-t-lg h-40">
+                        <div className="relative overflow-hidden rounded-t-lg h-40 bg-muted">
                           <img 
-                            src={item.menu_items.image_url} 
+                            src={item.menu_items.image_url || "https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=400"} 
                             alt={item.menu_items.name}
                             className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
+                            onError={(e) => {
+                              e.currentTarget.src = "https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=400";
+                            }}
                           />
                           <Button
                             variant="ghost"
@@ -715,11 +721,14 @@ const Dashboard = () => {
             </Button>
 
             <Card className="mb-6 shadow-soft">
-              <div className="relative h-48 overflow-hidden rounded-t-lg">
+              <div className="relative h-48 overflow-hidden rounded-t-lg bg-muted">
                 <img 
-                  src={selectedRestaurant.image_url} 
+                  src={selectedRestaurant.image_url || "https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?w=400"} 
                   alt={selectedRestaurant.name}
                   className="w-full h-full object-cover"
+                  onError={(e) => {
+                    e.currentTarget.src = "https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?w=400";
+                  }}
                 />
               </div>
               <CardContent className="p-6">
@@ -860,11 +869,14 @@ const Dashboard = () => {
                           </div>
                         </div>
                       </div>
-                      <div className="w-32 h-32 flex-shrink-0 overflow-hidden rounded-lg">
+                  <div className="w-32 h-32 flex-shrink-0 overflow-hidden rounded-lg bg-muted">
                         <img 
-                          src={item.image_url} 
+                          src={item.image_url || "https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=400"} 
                           alt={item.name}
                           className="w-full h-full object-cover hover:scale-110 transition-transform duration-300"
+                          onError={(e) => {
+                            e.currentTarget.src = "https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=400";
+                          }}
                         />
                       </div>
                     </div>
@@ -890,9 +902,12 @@ const Dashboard = () => {
               {cartItems.map((item) => (
                 <div key={item.id} className="flex items-center gap-3 pb-3 border-b">
                   <img 
-                    src={item.menu_items.image_url} 
+                    src={item.menu_items.image_url || "https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=400"} 
                     alt={item.menu_items.name}
-                    className="w-16 h-16 rounded-lg object-cover"
+                    className="w-16 h-16 rounded-lg object-cover bg-muted"
+                    onError={(e) => {
+                      e.currentTarget.src = "https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=400";
+                    }}
                   />
                   <div className="flex-1">
                     <h4 className="font-semibold">{item.menu_items.name}</h4>
