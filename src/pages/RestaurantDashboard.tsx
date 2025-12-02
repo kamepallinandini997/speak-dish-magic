@@ -24,7 +24,8 @@ import {
   CheckCircle,
   Truck,
   ChefHat,
-  Star
+  Star,
+  Leaf
 } from "lucide-react";
 
 interface Restaurant {
@@ -454,20 +455,24 @@ const RestaurantDashboard = () => {
 
             <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
               {menuItems.map((item) => (
-                <Card key={item.id}>
-                  <CardHeader>
-                    {item.image_url && (
-                      <div className="relative h-48 overflow-hidden rounded-lg mb-3 bg-muted">
-                        <img 
-                          src={item.image_url || "https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=400"} 
-                          alt={item.name}
-                          className="w-full h-full object-cover hover:scale-110 transition-transform duration-300"
-                          onError={(e) => {
-                            e.currentTarget.src = "https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=400";
-                          }}
-                        />
-                      </div>
+                <Card key={item.id} className="group overflow-hidden">
+                  <div className="relative h-48 overflow-hidden bg-muted">
+                    <img 
+                      src={item.image_url || "https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=500"} 
+                      alt={item.name}
+                      className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
+                      onError={(e) => {
+                        e.currentTarget.src = "https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=500";
+                      }}
+                    />
+                    {item.is_vegetarian && (
+                      <Badge className="absolute top-3 right-3 bg-secondary/95 backdrop-blur shadow-soft">
+                        <Leaf className="h-3 w-3 mr-1" />
+                        Veg
+                      </Badge>
                     )}
+                  </div>
+                  <CardHeader>
                     <div className="flex items-start justify-between">
                       <div className="flex-1">
                         <CardTitle className="text-base">{item.name}</CardTitle>

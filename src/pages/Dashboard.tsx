@@ -830,55 +830,54 @@ const Dashboard = () => {
               </CardContent>
             </Card>
 
-            <div className="space-y-4">
+            <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
               {filteredMenuItems.map((item) => (
-                <Card key={item.id} className="hover:shadow-hover transition-all">
+                <Card key={item.id} className="group hover:shadow-hover transition-all overflow-hidden">
+                  <div className="relative overflow-hidden h-48 bg-muted">
+                    <img 
+                      src={item.image_url || "https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=500"} 
+                      alt={item.name}
+                      className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
+                      onError={(e) => {
+                        e.currentTarget.src = "https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=500";
+                      }}
+                    />
+                    {/* Rating Badge */}
+                    <Badge className="absolute top-3 left-3 bg-background/95 backdrop-blur shadow-soft">
+                      <Star className="h-3 w-3 mr-1 fill-primary text-primary" />
+                      {item.rating}
+                    </Badge>
+                    {/* Veg Badge */}
+                    {item.is_vegetarian && (
+                      <Badge className="absolute top-3 right-3 bg-secondary/95 backdrop-blur shadow-soft">
+                        <Leaf className="h-3 w-3 mr-1" />
+                        Veg
+                      </Badge>
+                    )}
+                    {/* Wishlist Button */}
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="absolute bottom-3 right-3 h-10 w-10 rounded-full bg-background/90 backdrop-blur hover:bg-background shadow-soft"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        addToWishlist(item);
+                      }}
+                    >
+                      <Heart className="h-4 w-4 text-accent" />
+                    </Button>
+                  </div>
                   <CardContent className="p-4">
-                    <div className="flex gap-4">
-                      <div className="flex-1">
-                        <div className="flex items-start justify-between mb-2">
-                          <div>
-                            <h3 className="font-semibold text-lg mb-1">{item.name}</h3>
-                            {item.is_vegetarian && (
-                              <Badge variant="outline" className="border-secondary text-secondary">
-                                <Leaf className="h-3 w-3 mr-1" />
-                                Veg
-                              </Badge>
-                            )}
-                          </div>
-                          <div className="flex items-center gap-1">
-                            <Star className="h-4 w-4 fill-primary text-primary" />
-                            <span className="font-medium">{item.rating}</span>
-                          </div>
-                        </div>
-                        <p className="text-sm text-muted-foreground mb-3">{item.description}</p>
-                        <div className="flex items-center justify-between">
-                          <span className="font-bold text-xl">₹{item.price}</span>
-                          <div className="flex gap-2">
-                            <Button 
-                              size="sm" 
-                              variant="outline"
-                              onClick={() => addToWishlist(item)}
-                            >
-                              <Heart className="h-4 w-4" />
-                            </Button>
-                            <Button size="sm" onClick={() => addToCart(item)}>
-                              <Plus className="h-4 w-4 mr-1" />
-                              Add to Cart
-                            </Button>
-                          </div>
-                        </div>
-                      </div>
-                  <div className="w-32 h-32 flex-shrink-0 overflow-hidden rounded-lg bg-muted">
-                        <img 
-                          src={item.image_url || "https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=400"} 
-                          alt={item.name}
-                          className="w-full h-full object-cover hover:scale-110 transition-transform duration-300"
-                          onError={(e) => {
-                            e.currentTarget.src = "https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=400";
-                          }}
-                        />
-                      </div>
+                    <div className="mb-3">
+                      <h3 className="font-bold text-lg mb-1">{item.name}</h3>
+                      <p className="text-sm text-muted-foreground line-clamp-2">{item.description}</p>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span className="font-bold text-xl">₹{item.price}</span>
+                      <Button size="sm" onClick={() => addToCart(item)} className="shadow-soft">
+                        <Plus className="h-4 w-4 mr-1" />
+                        Add
+                      </Button>
                     </div>
                   </CardContent>
                 </Card>
