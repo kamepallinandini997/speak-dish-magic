@@ -7,6 +7,7 @@ import Landing from "./pages/Landing";
 import Auth from "./pages/Auth";
 import Dashboard from "./pages/Dashboard";
 import RestaurantDashboard from "./pages/RestaurantDashboard";
+import RestaurantDetails from "./pages/RestaurantDetails";
 import Profile from "./pages/Profile";
 import Admin from "./pages/Admin";
 import NotFound from "./pages/NotFound";
@@ -23,6 +24,7 @@ const App = () => (
           <Route path="/" element={<Landing />} />
           <Route path="/auth" element={<Auth />} />
           <Route path="/dashboard" element={<Dashboard />} />
+          <Route path="/restaurant/:restaurantId" element={<RestaurantDetails />} />
           <Route path="/restaurant-dashboard" element={<RestaurantDashboard />} />
           <Route path="/profile" element={<Profile />} />
           <Route path="/admin" element={<Admin />} />
