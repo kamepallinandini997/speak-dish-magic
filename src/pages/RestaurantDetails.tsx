@@ -40,18 +40,22 @@ interface MenuItem {
   is_available: boolean;
 }
 
+type DietFilter = "All" | "Veg" | "Non-Veg";
+
 const RestaurantDetails = () => {
   const { restaurantId } = useParams<{ restaurantId: string }>();
   const [restaurant, setRestaurant] = useState<Restaurant | null>(null);
   const [menuItems, setMenuItems] = useState<MenuItem[]>([]);
   const [selectedCategory, setSelectedCategory] = useState("All");
+  const [selectedDiet, setSelectedDiet] = useState<DietFilter>("All");
   const [cartQuantities, setCartQuantities] = useState<Record<string, number>>({});
   const [userId, setUserId] = useState<string | null>(null);
   
   const navigate = useNavigate();
   const { toast } = useToast();
 
-  const categories = ["All", "Starters", "Biryani", "Curries", "Tandoori", "Chinese", "Desserts", "Beverages"];
+  const categories = ["All", "Biryani", "Pizza", "Burger", "Desserts", "Healthy", "Beverages"];
+  const dietFilters: DietFilter[] = ["All", "Veg", "Non-Veg"];
 
   useEffect(() => {
     checkAuth();
@@ -171,9 +175,35 @@ const RestaurantDetails = () => {
     });
   };
 
-  const filteredMenuItems = selectedCategory === "All" 
-    ? menuItems 
-    : menuItems.filter(item => item.category === selectedCategory);
+  const getFilteredMenuItems = () => {
+    let filtered = menuItems;
+
+    // Apply category filter
+    if (selectedCategory !== "All") {
+      filtered = filtered.filter(item => 
+        item.category?.toLowerCase() === selectedCategory.toLowerCase()
+      );
+    }
+
+    // Apply diet filter
+    if (selectedDiet === "Veg") {
+      filtered = filtered.filter(item => item.is_vegetarian);
+    } else if (selectedDiet === "Non-Veg") {
+      filtered = filtered.filter(item => !item.is_vegetarian);
+    }
+
+    // Fallback logic: if no items match, show top 3 rated items
+    if (filtered.length === 0 && menuItems.length > 0) {
+      return menuItems
+        .sort((a, b) => (b.rating || 0) - (a.rating || 0))
+        .slice(0, 3);
+    }
+
+    return filtered;
+  };
+
+  const filteredMenuItems = getFilteredMenuItems();
+  const hasNoResults = selectedCategory !== "All" || selectedDiet !== "All";
 
   if (!restaurant) {
     return (
@@ -224,38 +254,60 @@ const RestaurantDetails = () => {
       </div>
 
       <div className="container mx-auto px-4 py-6">
-        <div className="flex gap-6">
-          {/* Left Sidebar - Category Filters */}
-          <aside className="w-64 sticky top-24 h-fit">
-            <Card className="shadow-soft">
-              <CardContent className="p-4">
-                <h2 className="font-semibold mb-4 text-lg">Categories</h2>
-                <div className="space-y-2">
-                  {categories.map((category) => (
-                    <button
-                      key={category}
-                      onClick={() => setSelectedCategory(category)}
-                      className={`w-full text-left px-4 py-3 rounded-lg transition-all duration-200 ${
-                        selectedCategory === category
-                          ? "bg-primary text-primary-foreground shadow-chip font-medium"
-                          : "bg-muted/50 hover:bg-muted text-foreground"
-                      }`}
-                    >
-                      {category}
-                    </button>
-                  ))}
-                </div>
-              </CardContent>
-            </Card>
-          </aside>
+        {/* Filters Row - Below Restaurant Header */}
+        <div className="mb-8 space-y-4">
+          <div className="flex flex-wrap gap-2">
+            <span className="text-sm font-medium text-muted-foreground mr-2 flex items-center">
+              Categories:
+            </span>
+            {categories.map((category) => (
+              <button
+                key={category}
+                onClick={() => setSelectedCategory(category)}
+                className={`px-4 py-2 rounded-full text-sm font-medium transition-all duration-200 ${
+                  selectedCategory === category
+                    ? "bg-primary text-primary-foreground shadow-chip"
+                    : "bg-muted hover:bg-muted/80 text-foreground"
+                }`}
+              >
+                {category}
+              </button>
+            ))}
+          </div>
 
-          {/* Right Side - Menu Items */}
-          <div className="flex-1">
-            {selectedCategory !== "All" && (
-              <h2 className="text-2xl font-bold mb-6">{selectedCategory}</h2>
-            )}
-            
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          <div className="flex flex-wrap gap-2">
+            <span className="text-sm font-medium text-muted-foreground mr-2 flex items-center">
+              Diet:
+            </span>
+            {dietFilters.map((diet) => (
+              <button
+                key={diet}
+                onClick={() => setSelectedDiet(diet)}
+                className={`px-4 py-2 rounded-full text-sm font-medium transition-all duration-200 flex items-center gap-2 ${
+                  selectedDiet === diet
+                    ? "bg-primary text-primary-foreground shadow-chip"
+                    : "bg-muted hover:bg-muted/80 text-foreground"
+                }`}
+              >
+                {diet === "Veg" && <span>🟢</span>}
+                {diet === "Non-Veg" && <span>🔴</span>}
+                {diet}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* Menu Items Grid */}
+        <div>
+          {hasNoResults && filteredMenuItems.length < menuItems.length && (
+            <div className="mb-6 p-4 bg-muted/50 rounded-lg">
+              <p className="text-sm text-muted-foreground">
+                No matching items found. Showing other recommendations.
+              </p>
+            </div>
+          )}
+          
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
               {filteredMenuItems.map((item) => (
                 <Card 
                   key={item.id} 
@@ -333,17 +385,8 @@ const RestaurantDetails = () => {
                 </Card>
               ))}
             </div>
-
-            {filteredMenuItems.length === 0 && (
-              <div className="text-center py-12">
-                <p className="text-muted-foreground text-lg">
-                  No items found in this category
-                </p>
-              </div>
-            )}
           </div>
         </div>
-      </div>
     </div>
   );
 };
