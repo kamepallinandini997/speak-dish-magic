@@ -1,15 +1,25 @@
-import { useState, useRef, useEffect } from "react";
-import { Button } from "@/components/ui/button";
-import { Mic, MicOff, Send, Volume2, Loader2 } from "lucide-react";
+import { useState, useRef, useEffect, useCallback } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
-import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { ChatSidebar } from "@/components/chat/ChatSidebar";
+import { ChatMessageArea } from "@/components/chat/ChatMessageArea";
+import { ChatSuggestions } from "@/components/chat/ChatSuggestions";
+import { useIsMobile } from "@/hooks/use-mobile";
 
 interface Message {
   role: "user" | "assistant";
   content: string;
+  timestamp?: string;
+}
+
+interface ChatSession {
+  id: string;
+  title: string;
+  created_at: string;
+  updated_at: string;
 }
 
 interface VoiceChatProps {
@@ -18,6 +28,7 @@ interface VoiceChatProps {
 
 export const VoiceChat = ({ isActive }: VoiceChatProps) => {
   const [messages, setMessages] = useState<Message[]>([]);
+  const [sessions, setSessions] = useState<ChatSession[]>([]);
   const [isListening, setIsListening] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
   const [isSpeaking, setIsSpeaking] = useState(false);
@@ -27,11 +38,13 @@ export const VoiceChat = ({ isActive }: VoiceChatProps) => {
   const [sessionId, setSessionId] = useState<string | null>(null);
   const [showCheckout, setShowCheckout] = useState(false);
   const [checkoutData, setCheckoutData] = useState<any>(null);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(true);
   const { toast } = useToast();
-  const messagesEndRef = useRef<HTMLDivElement>(null);
   const recognitionRef = useRef<any>(null);
   const utteranceRef = useRef<SpeechSynthesisUtterance | null>(null);
+  const isMobile = useIsMobile();
 
+  // Initialize speech recognition and load user data
   useEffect(() => {
     // Initialize Web Speech API
     if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
@@ -57,11 +70,11 @@ export const VoiceChat = ({ isActive }: VoiceChatProps) => {
       };
     }
 
-    // Get current user and create new session
+    // Get current user
     supabase.auth.getSession().then(async ({ data: { session } }) => {
       if (session) {
         setUserId(session.user.id);
-        await createNewSession(session.user.id);
+        await loadSessions(session.user.id);
       }
     });
 
@@ -82,15 +95,64 @@ export const VoiceChat = ({ isActive }: VoiceChatProps) => {
     }
   }, [isActive, isListening]);
 
-  const createNewSession = async (uid: string) => {
+  // Load all chat sessions for user
+  const loadSessions = async (uid: string) => {
     const { data, error } = await supabase
       .from("chat_sessions")
-      .insert({ user_id: uid })
+      .select("*")
+      .eq("user_id", uid)
+      .order("updated_at", { ascending: false });
+
+    if (!error && data) {
+      // Load titles from first message of each session
+      const sessionsWithTitles = await Promise.all(
+        data.map(async (session) => {
+          const { data: messages } = await supabase
+            .from("chat_messages")
+            .select("content")
+            .eq("session_id", session.id)
+            .eq("role", "user")
+            .order("created_at", { ascending: true })
+            .limit(1);
+
+          const title = messages?.[0]?.content?.slice(0, 40) || "New Conversation";
+          return { ...session, title: title + (title.length >= 40 ? "..." : "") };
+        })
+      );
+      setSessions(sessionsWithTitles);
+
+      // Select most recent session or create new one
+      if (sessionsWithTitles.length > 0) {
+        await selectSession(sessionsWithTitles[0].id);
+      } else {
+        await createNewSession(uid);
+      }
+    }
+  };
+
+  const createNewSession = async (uid?: string) => {
+    const userIdToUse = uid || userId;
+    if (!userIdToUse) return;
+
+    const { data, error } = await supabase
+      .from("chat_sessions")
+      .insert({ user_id: userIdToUse })
       .select()
       .single();
 
     if (!error && data) {
       setSessionId(data.id);
+      setMessages([]);
+      const newSession = { ...data, title: "New Conversation" };
+      setSessions((prev) => [newSession, ...prev]);
+    }
+  };
+
+  const selectSession = async (sid: string) => {
+    setSessionId(sid);
+    await loadChatHistory(sid);
+    if (isMobile) {
+      setSidebarCollapsed(true);
     }
   };
 
@@ -102,9 +164,10 @@ export const VoiceChat = ({ isActive }: VoiceChatProps) => {
       .order("created_at", { ascending: true });
 
     if (!error && data) {
-      const loadedMessages: Message[] = data.map(msg => ({
+      const loadedMessages: Message[] = data.map((msg) => ({
         role: msg.role as "user" | "assistant",
         content: msg.content,
+        timestamp: msg.created_at || undefined,
       }));
       setMessages(loadedMessages);
     }
@@ -119,37 +182,68 @@ export const VoiceChat = ({ isActive }: VoiceChatProps) => {
       role: message.role,
       content: message.content,
     });
+
+    // Update session's updated_at
+    await supabase
+      .from("chat_sessions")
+      .update({ updated_at: new Date().toISOString() })
+      .eq("id", sessionId);
+
+    // Update session title if first user message
+    if (message.role === "user" && messages.filter((m) => m.role === "user").length === 0) {
+      const title = message.content.slice(0, 40) + (message.content.length >= 40 ? "..." : "");
+      setSessions((prev) =>
+        prev.map((s) => (s.id === sessionId ? { ...s, title } : s))
+      );
+    }
   };
 
-  useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages]);
+  const clearAllSessions = async () => {
+    if (!userId) return;
 
-  const stopSpeaking = () => {
+    // Delete all messages first
+    await supabase.from("chat_messages").delete().eq("user_id", userId);
+    // Delete all sessions
+    await supabase.from("chat_sessions").delete().eq("user_id", userId);
+
+    setSessions([]);
+    setMessages([]);
+    setSessionId(null);
+
+    // Create a new session
+    await createNewSession();
+
+    toast({
+      title: "Chats cleared",
+      description: "All your chat history has been deleted",
+    });
+  };
+
+  const stopSpeaking = useCallback(() => {
     if ('speechSynthesis' in window && window.speechSynthesis.speaking) {
       window.speechSynthesis.cancel();
       setIsSpeaking(false);
     }
-  };
+  }, []);
 
-  const speak = (text: string) => {
+  const speak = useCallback((text: string) => {
     if ('speechSynthesis' in window && voiceEnabled) {
       stopSpeaking();
       
       // Clean text from special symbols and emojis for TTS
       const cleanText = text
-        .replace(/[*_~`#\[\](){}]/g, '') // Remove markdown symbols
-        .replace(/[\u{1F600}-\u{1F64F}]/gu, '') // Remove emoticons
-        .replace(/[\u{1F300}-\u{1F5FF}]/gu, '') // Remove misc symbols & pictographs
-        .replace(/[\u{1F680}-\u{1F6FF}]/gu, '') // Remove transport & map symbols
-        .replace(/[\u{1F1E0}-\u{1F1FF}]/gu, '') // Remove flags
-        .replace(/[\u{2600}-\u{26FF}]/gu, '')   // Remove misc symbols
-        .replace(/[\u{2700}-\u{27BF}]/gu, '')   // Remove dingbats
-        .replace(/[\u{FE00}-\u{FE0F}]/gu, '')   // Remove variation selectors
-        .replace(/[\u{1F900}-\u{1F9FF}]/gu, '') // Remove supplemental symbols
-        .replace(/[\u{1FA00}-\u{1FA6F}]/gu, '') // Remove chess & cards
-        .replace(/[\u{1FA70}-\u{1FAFF}]/gu, '') // Remove extended pictographs
-        .replace(/\s+/g, ' ')                    // Normalize whitespace
+        .replace(/[*_~`#\[\](){}]/g, '')
+        .replace(/[\u{1F600}-\u{1F64F}]/gu, '')
+        .replace(/[\u{1F300}-\u{1F5FF}]/gu, '')
+        .replace(/[\u{1F680}-\u{1F6FF}]/gu, '')
+        .replace(/[\u{1F1E0}-\u{1F1FF}]/gu, '')
+        .replace(/[\u{2600}-\u{26FF}]/gu, '')
+        .replace(/[\u{2700}-\u{27BF}]/gu, '')
+        .replace(/[\u{FE00}-\u{FE0F}]/gu, '')
+        .replace(/[\u{1F900}-\u{1F9FF}]/gu, '')
+        .replace(/[\u{1FA00}-\u{1FA6F}]/gu, '')
+        .replace(/[\u{1FA70}-\u{1FAFF}]/gu, '')
+        .replace(/\s+/g, ' ')
         .trim();
       
       const utterance = new SpeechSynthesisUtterance(cleanText);
@@ -160,17 +254,16 @@ export const VoiceChat = ({ isActive }: VoiceChatProps) => {
       utteranceRef.current = utterance;
       window.speechSynthesis.speak(utterance);
     }
-  };
+  }, [voiceEnabled, stopSpeaking]);
 
-  const startListening = () => {
+  // Voice input - NO auto-submit, just populate text box
+  const startListening = useCallback(() => {
     if (recognitionRef.current) {
-      // Stop AI speaking when user starts speaking
       stopSpeaking();
       
       recognitionRef.current.onresult = (event: any) => {
         const transcript = event.results[0][0].transcript;
-        setInputText(transcript);
-        handleSendMessage(transcript);
+        setInputText(transcript); // Just set the text, don't send
       };
       
       try {
@@ -192,20 +285,23 @@ export const VoiceChat = ({ isActive }: VoiceChatProps) => {
         variant: "destructive",
       });
     }
-  };
+  }, [stopSpeaking, toast]);
 
-  const stopListening = () => {
+  const stopListening = useCallback(() => {
     if (recognitionRef.current) {
       recognitionRef.current.stop();
     }
     setIsListening(false);
-  };
+  }, []);
 
-  const handleSendMessage = async (text?: string) => {
-    const messageText = text || inputText;
-    if (!messageText.trim() || isProcessing) return;
+  const handleSendMessage = useCallback(async () => {
+    if (!inputText.trim() || isProcessing) return;
 
-    const userMessage: Message = { role: "user", content: messageText };
+    const userMessage: Message = { 
+      role: "user", 
+      content: inputText,
+      timestamp: new Date().toISOString()
+    };
     setMessages((prev) => [...prev, userMessage]);
     await saveChatMessage(userMessage);
     setInputText("");
@@ -223,16 +319,16 @@ export const VoiceChat = ({ isActive }: VoiceChatProps) => {
       const assistantMessage: Message = {
         role: "assistant",
         content: data.response || "I couldn't process that. Please try again.",
+        timestamp: new Date().toISOString()
       };
       
       setMessages((prev) => [...prev, assistantMessage]);
       await saveChatMessage(assistantMessage);
       speak(assistantMessage.content);
 
-      // Check if AI wants to proceed to checkout
       if (data.response?.toLowerCase().includes("proceed to checkout") || 
           data.response?.toLowerCase().includes("ready to order")) {
-        setCheckoutData({ total: 0 }); // Will be calculated from cart
+        setCheckoutData({ total: 0 });
         setShowCheckout(true);
       }
     } catch (error: any) {
@@ -244,7 +340,14 @@ export const VoiceChat = ({ isActive }: VoiceChatProps) => {
     } finally {
       setIsProcessing(false);
     }
-  };
+  }, [inputText, isProcessing, messages, speak, toast]);
+
+  const handleToggleVoice = useCallback(() => {
+    setVoiceEnabled((prev) => {
+      if (prev) stopSpeaking();
+      return !prev;
+    });
+  }, [stopSpeaking]);
 
   const handleMockCheckout = () => {
     toast({
@@ -256,9 +359,10 @@ export const VoiceChat = ({ isActive }: VoiceChatProps) => {
 
   return (
     <>
+      {/* Checkout Modal */}
       {showCheckout && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-card rounded-xl p-6 max-w-md w-full space-y-4">
+          <div className="bg-card rounded-xl p-6 max-w-md w-full space-y-4 animate-in zoom-in-95">
             <h3 className="text-xl font-bold">Complete Your Order</h3>
             <div className="space-y-2">
               <Input placeholder="Delivery Address" />
@@ -285,98 +389,40 @@ export const VoiceChat = ({ isActive }: VoiceChatProps) => {
         </div>
       )}
       
-      <div className="flex flex-col h-[600px] bg-card rounded-xl border border-border shadow-soft">
-      {/* Header with voice toggle */}
-      <div className="flex items-center justify-between p-4 border-b border-border">
-        <h3 className="font-semibold text-foreground">AI Food Assistant</h3>
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={() => {
-            setVoiceEnabled(!voiceEnabled);
-            if (voiceEnabled) stopSpeaking();
-          }}
-        >
-          {voiceEnabled ? "🔊 Voice On" : "🔇 Voice Off"}
-        </Button>
-      </div>
-
-      {/* Messages */}
-      <div className="flex-1 overflow-y-auto p-4 space-y-4">
-        {messages.length === 0 && (
-          <div className="text-center text-muted-foreground py-12">
-            <Mic className="w-16 h-16 mx-auto mb-4 text-primary" />
-            <p className="text-lg font-medium mb-2">Start a conversation</p>
-            <p className="text-sm">Click the microphone or type to order food</p>
-          </div>
-        )}
-        
-        {messages.map((message, index) => (
-          <div
-            key={index}
-            className={`flex ${message.role === "user" ? "justify-end" : "justify-start"}`}
-          >
-            <div
-              className={`max-w-[80%] rounded-2xl px-4 py-3 ${
-                message.role === "user"
-                  ? "bg-gradient-hero text-primary-foreground"
-                  : "bg-muted text-foreground"
-              }`}
-            >
-              <p className="text-sm whitespace-pre-wrap">{message.content}</p>
-            </div>
-          </div>
-        ))}
-        
-        {isProcessing && (
-          <div className="flex justify-start">
-            <div className="bg-muted rounded-2xl px-4 py-3">
-              <Loader2 className="w-5 h-5 animate-spin text-primary" />
-            </div>
-          </div>
-        )}
-        
-        <div ref={messagesEndRef} />
-      </div>
-
-      {/* Input */}
-      <div className="border-t border-border p-4 space-y-3">
-        <Textarea
-          placeholder="Type or speak your order..."
-          value={inputText}
-          onChange={(e) => setInputText(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key === "Enter" && !e.shiftKey) {
-              e.preventDefault();
-              handleSendMessage();
-            }
-          }}
-          className="resize-none"
-          rows={2}
+      {/* Three-Panel Layout */}
+      <div className="flex h-[calc(100vh-200px)] min-h-[500px] bg-background rounded-xl border border-border shadow-soft overflow-hidden">
+        {/* Left Sidebar - Chat History */}
+        <ChatSidebar
+          sessions={sessions}
+          currentSessionId={sessionId}
+          onSelectSession={selectSession}
+          onNewChat={() => createNewSession()}
+          onClearAll={clearAllSessions}
+          isCollapsed={sidebarCollapsed}
+          onToggleCollapse={() => setSidebarCollapsed(!sidebarCollapsed)}
         />
-        
-        <div className="flex gap-2">
-          <Button
-            variant={isListening ? "default" : "outline"}
-            size="icon"
-            onClick={isListening ? stopListening : startListening}
-            disabled={isProcessing}
-            className="flex-shrink-0"
-          >
-            {isListening ? <MicOff className="w-5 h-5" /> : <Mic className="w-5 h-5" />}
-          </Button>
-          
-          <Button
-            onClick={() => handleSendMessage()}
-            disabled={!inputText.trim() || isProcessing}
-            className="flex-1"
-          >
-            <Send className="w-4 h-4 mr-2" />
-            Send
-          </Button>
+
+        {/* Middle Panel - Chat Area */}
+        <div className="flex-1 min-w-0">
+          <ChatMessageArea
+            messages={messages}
+            inputText={inputText}
+            setInputText={setInputText}
+            isProcessing={isProcessing}
+            isListening={isListening}
+            isSpeaking={isSpeaking}
+            voiceEnabled={voiceEnabled}
+            onSendMessage={handleSendMessage}
+            onStartListening={startListening}
+            onStopListening={stopListening}
+            onToggleVoice={handleToggleVoice}
+            onStopSpeaking={stopSpeaking}
+          />
         </div>
+
+        {/* Right Panel - Suggestions */}
+        <ChatSuggestions messages={messages} isVisible={!isMobile} />
       </div>
-    </div>
     </>
   );
 };
