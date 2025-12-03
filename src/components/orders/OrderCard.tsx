@@ -106,10 +106,7 @@ export function OrderCard({ order, onClick }: OrderCardProps) {
           <div className="flex-1 min-w-0">
             <div className="flex items-start justify-between gap-2">
               <div className="min-w-0">
-                <p className="font-semibold text-base truncate">
-                  #{order.id.slice(0, 8).toUpperCase()}
-                </p>
-                <p className="text-sm text-muted-foreground">
+                <p className="font-semibold text-base text-muted-foreground">
                   {new Date(order.created_at).toLocaleDateString('en-IN', {
                     day: 'numeric',
                     month: 'short',
