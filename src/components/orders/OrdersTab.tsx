@@ -94,15 +94,12 @@ export function OrdersTab({ orders, onReview, onBrowseRestaurants, userId, onCar
   }
 
   return (
-    <div className="space-y-4">
-      {/* Header with Filters */}
+    <div className="space-y-3">
+      {/* Compact Header with Filters */}
       <div className="flex items-center justify-between">
-        <div>
-          <h2 className="text-lg font-bold">Your Orders</h2>
-          <p className="text-sm text-muted-foreground">
-            {filteredAndSortedOrders.length} order{filteredAndSortedOrders.length !== 1 ? "s" : ""}
-          </p>
-        </div>
+        <p className="text-sm text-muted-foreground">
+          {filteredAndSortedOrders.length} order{filteredAndSortedOrders.length !== 1 ? "s" : ""}
+        </p>
         <OrderFilters
           filter={filter}
           sort={sort}
@@ -113,11 +110,11 @@ export function OrdersTab({ orders, onReview, onBrowseRestaurants, userId, onCar
 
       {/* Orders List */}
       {filteredAndSortedOrders.length === 0 ? (
-        <div className="text-center py-12">
-          <p className="text-muted-foreground">No orders match your filter</p>
+        <div className="text-center py-8">
+          <p className="text-sm text-muted-foreground">No orders match your filter</p>
         </div>
       ) : (
-        <div className="space-y-4">
+        <div className="space-y-2.5">
           {filteredAndSortedOrders.map((order) => (
             <OrderCard
               key={order.id}

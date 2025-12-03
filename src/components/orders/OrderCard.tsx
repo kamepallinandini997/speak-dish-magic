@@ -14,7 +14,8 @@ import {
   Smartphone,
   RotateCcw,
   User,
-  MapPin
+  MapPin,
+  Package
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -55,15 +56,14 @@ const deliveryPartners = ["Ravi Kumar", "Deepak Singh", "Suresh", "Anil", "Prasa
 export function OrderCard({ order, onReview, onReorder }: OrderCardProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [orderItems, setOrderItems] = useState<OrderItem[]>([]);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
 
   const deliveryPartner = deliveryPartners[Math.floor(order.id.charCodeAt(0) % deliveryPartners.length)];
 
+  // Fetch order items immediately on mount for thumbnail preview
   useEffect(() => {
-    if (isOpen && orderItems.length === 0) {
-      fetchOrderItems();
-    }
-  }, [isOpen]);
+    fetchOrderItems();
+  }, [order.id]);
 
   const fetchOrderItems = async () => {
     setLoading(true);
@@ -106,24 +106,24 @@ export function OrderCard({ order, onReview, onReorder }: OrderCardProps) {
   return (
     <Collapsible open={isOpen} onOpenChange={setIsOpen}>
       <Card className={cn(
-        "transition-all duration-300 hover:shadow-hover overflow-hidden",
-        isOpen && "shadow-hover ring-1 ring-primary/10"
+        "transition-all duration-300 hover:shadow-md overflow-hidden bg-card",
+        isOpen && "shadow-lg ring-1 ring-primary/10"
       )}>
         <CollapsibleTrigger asChild>
-          <CardContent className="p-4 sm:p-6 cursor-pointer">
-            <div className="flex gap-4">
-              {/* Thumbnail Preview */}
-              <div className="flex-shrink-0 w-20 h-20 sm:w-24 sm:h-24 relative">
-                {orderItems.length > 0 ? (
+          <CardContent className="p-3 cursor-pointer">
+            <div className="flex items-center gap-3">
+              {/* Thumbnail Preview - Always visible */}
+              <div className="flex-shrink-0 w-14 h-14 relative">
+                {loading ? (
+                  <div className="w-full h-full rounded-lg bg-muted animate-pulse" />
+                ) : orderItems.length > 0 ? (
                   <div className="grid grid-cols-2 gap-0.5 w-full h-full rounded-lg overflow-hidden bg-muted">
-                    {thumbnails.map((item, index) => (
+                    {thumbnails.slice(0, thumbnails.length === 1 ? 1 : thumbnails.length === 2 ? 2 : 4).map((item, index) => (
                       <div
                         key={item.id}
                         className={cn(
                           "overflow-hidden bg-muted",
-                          thumbnails.length === 1 && "col-span-2 row-span-2",
-                          thumbnails.length === 2 && "row-span-2",
-                          thumbnails.length === 3 && index === 0 && "row-span-2"
+                          thumbnails.length === 1 && "col-span-2 row-span-2"
                         )}
                       >
                         <img
@@ -137,13 +137,15 @@ export function OrderCard({ order, onReview, onReorder }: OrderCardProps) {
                       </div>
                     ))}
                     {remainingCount > 0 && (
-                      <div className="absolute bottom-1 right-1 bg-foreground/80 text-background text-xs px-1.5 py-0.5 rounded-full font-medium">
+                      <div className="absolute bottom-0.5 right-0.5 bg-foreground/80 text-background text-[10px] px-1 py-0.5 rounded-full font-medium">
                         +{remainingCount}
                       </div>
                     )}
                   </div>
                 ) : (
-                  <div className="w-full h-full rounded-lg bg-muted animate-pulse" />
+                  <div className="w-full h-full rounded-lg bg-muted flex items-center justify-center">
+                    <Package className="h-6 w-6 text-muted-foreground" />
+                  </div>
                 )}
               </div>
 
@@ -151,28 +153,24 @@ export function OrderCard({ order, onReview, onReorder }: OrderCardProps) {
               <div className="flex-1 min-w-0">
                 <div className="flex items-start justify-between gap-2">
                   <div className="min-w-0">
-                    <h3 className="font-bold text-base sm:text-lg truncate">
-                      Order #{order.id.slice(0, 8)}
-                    </h3>
-                    <p className="text-sm text-muted-foreground">
+                    <p className="font-semibold text-sm truncate">
+                      #{order.id.slice(0, 8).toUpperCase()}
+                    </p>
+                    <p className="text-xs text-muted-foreground">
                       {new Date(order.created_at).toLocaleDateString('en-IN', {
                         day: 'numeric',
                         month: 'short',
-                        year: 'numeric',
                         hour: '2-digit',
                         minute: '2-digit'
                       })}
                     </p>
                   </div>
-                  
-                  {/* Status Badge - Top Right */}
                   <OrderStatusBadge status={order.status} />
                 </div>
-
-                <div className="flex items-center justify-between mt-3">
-                  <span className="font-bold text-lg text-primary">₹{order.total_amount}</span>
+                <div className="flex items-center justify-between mt-1">
+                  <span className="font-bold text-base text-primary">₹{order.total_amount}</span>
                   <ChevronDown className={cn(
-                    "h-5 w-5 text-muted-foreground transition-transform duration-300",
+                    "h-4 w-4 text-muted-foreground transition-transform duration-300",
                     isOpen && "rotate-180"
                   )} />
                 </div>
@@ -182,24 +180,38 @@ export function OrderCard({ order, onReview, onReorder }: OrderCardProps) {
         </CollapsibleTrigger>
 
         <CollapsibleContent>
-          <div className="px-4 sm:px-6 pb-6 space-y-5 animate-in slide-in-from-top-2 duration-300">
+          <div className="px-3 pb-3 space-y-3 animate-in slide-in-from-top-2 duration-300">
             <Separator />
+
+            {/* Banner Image */}
+            {orderItems.length > 0 && (
+              <div className="w-full h-32 rounded-lg overflow-hidden">
+                <img
+                  src={orderItems[0]?.menu_items?.image_url || "https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=400"}
+                  alt="Order"
+                  className="w-full h-full object-cover"
+                  onError={(e) => {
+                    e.currentTarget.src = "https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=400";
+                  }}
+                />
+              </div>
+            )}
 
             {/* Order Timeline */}
             <div>
-              <h4 className="text-sm font-semibold mb-3">Order Status</h4>
+              <h4 className="text-xs font-semibold mb-2 text-muted-foreground uppercase tracking-wide">Status</h4>
               <OrderTimeline status={order.status} />
             </div>
 
             {/* Delivery Partner (for active orders) */}
             {(order.status === "delivering" || order.status === "preparing") && (
-              <div className="flex items-center gap-3 p-3 bg-secondary/10 rounded-lg">
-                <div className="w-10 h-10 rounded-full bg-secondary/20 flex items-center justify-center">
-                  <User className="h-5 w-5 text-secondary" />
+              <div className="flex items-center gap-2 p-2 bg-secondary/10 rounded-lg">
+                <div className="w-8 h-8 rounded-full bg-secondary/20 flex items-center justify-center">
+                  <User className="h-4 w-4 text-secondary" />
                 </div>
                 <div className="flex-1">
-                  <p className="font-medium text-sm">{deliveryPartner}</p>
-                  <p className="text-xs text-muted-foreground">
+                  <p className="font-medium text-xs">{deliveryPartner}</p>
+                  <p className="text-[10px] text-muted-foreground">
                     {order.status === "delivering" ? "On the way" : "Will pick up soon"}
                   </p>
                 </div>
@@ -208,60 +220,52 @@ export function OrderCard({ order, onReview, onReorder }: OrderCardProps) {
 
             {/* Order Items */}
             <div>
-              <h4 className="text-sm font-semibold mb-3">Items Ordered</h4>
-              {loading ? (
-                <div className="space-y-2">
-                  {[1, 2].map((i) => (
-                    <div key={i} className="h-16 bg-muted rounded-lg animate-pulse" />
-                  ))}
-                </div>
-              ) : (
-                <div className="space-y-2">
-                  {orderItems.map((item) => (
-                    <div key={item.id} className="flex items-center gap-3 p-2 rounded-lg bg-muted/50">
-                      <img
-                        src={item.menu_items?.image_url || "https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=60"}
-                        alt={item.item_name}
-                        className="w-12 h-12 rounded-lg object-cover flex-shrink-0"
-                        onError={(e) => {
-                          e.currentTarget.src = "https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=60";
-                        }}
-                      />
-                      <div className="flex-1 min-w-0">
-                        <p className="font-medium text-sm truncate">{item.item_name}</p>
-                        <p className="text-xs text-muted-foreground">Qty: {item.quantity}</p>
-                      </div>
-                      <span className="font-semibold text-sm">₹{item.price * item.quantity}</span>
+              <h4 className="text-xs font-semibold mb-2 text-muted-foreground uppercase tracking-wide">Items</h4>
+              <div className="space-y-1.5">
+                {orderItems.map((item) => (
+                  <div key={item.id} className="flex items-center gap-2 p-1.5 rounded-lg bg-muted/50">
+                    <img
+                      src={item.menu_items?.image_url || "https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=60"}
+                      alt={item.item_name}
+                      className="w-10 h-10 rounded-md object-cover flex-shrink-0"
+                      onError={(e) => {
+                        e.currentTarget.src = "https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=60";
+                      }}
+                    />
+                    <div className="flex-1 min-w-0">
+                      <p className="font-medium text-xs truncate">{item.item_name}</p>
+                      <p className="text-[10px] text-muted-foreground">x{item.quantity}</p>
                     </div>
-                  ))}
-                </div>
-              )}
+                    <span className="font-semibold text-xs">₹{item.price * item.quantity}</span>
+                  </div>
+                ))}
+              </div>
             </div>
 
             {/* Delivery Address */}
-            <div className="flex items-start gap-3 p-3 bg-muted/50 rounded-lg">
-              <MapPin className="h-4 w-4 text-muted-foreground mt-0.5" />
-              <div>
-                <p className="text-xs text-muted-foreground">Delivered to</p>
-                <p className="text-sm font-medium">{order.delivery_address || "123 Main St, City"}</p>
+            <div className="flex items-start gap-2 p-2 bg-muted/50 rounded-lg">
+              <MapPin className="h-3.5 w-3.5 text-muted-foreground mt-0.5 flex-shrink-0" />
+              <div className="min-w-0">
+                <p className="text-[10px] text-muted-foreground">Delivered to</p>
+                <p className="text-xs font-medium truncate">{order.delivery_address || "123 Main St, City"}</p>
               </div>
             </div>
 
             {/* Payment Method */}
-            <div className="flex items-center gap-3 p-3 bg-muted/50 rounded-lg">
+            <div className="flex items-center gap-2 p-2 bg-muted/50 rounded-lg">
               {paymentMethodIcon[order.payment_method as keyof typeof paymentMethodIcon] || paymentMethodIcon.cash}
               <div>
-                <p className="text-xs text-muted-foreground">Payment Method</p>
-                <p className="text-sm font-medium">
+                <p className="text-[10px] text-muted-foreground">Payment</p>
+                <p className="text-xs font-medium">
                   {paymentMethodLabel[order.payment_method as keyof typeof paymentMethodLabel] || "Cash on Delivery"}
                 </p>
               </div>
             </div>
 
             {/* Bill Summary */}
-            <div className="p-4 bg-muted/30 rounded-lg border">
-              <h4 className="text-sm font-semibold mb-3">Bill Summary</h4>
-              <div className="space-y-2 text-sm">
+            <div className="p-2.5 bg-muted/30 rounded-lg border">
+              <h4 className="text-xs font-semibold mb-2 text-muted-foreground uppercase tracking-wide">Bill Summary</h4>
+              <div className="space-y-1 text-xs">
                 <div className="flex justify-between">
                   <span className="text-muted-foreground">Subtotal</span>
                   <span>₹{subtotal || order.total_amount - deliveryFee - taxes + discount}</span>
@@ -276,12 +280,12 @@ export function OrderCard({ order, onReview, onReorder }: OrderCardProps) {
                 </div>
                 {discount > 0 && (
                   <div className="flex justify-between text-secondary">
-                    <span>Discount (10%)</span>
+                    <span>Discount</span>
                     <span>-₹{discount}</span>
                   </div>
                 )}
-                <Separator className="my-2" />
-                <div className="flex justify-between font-bold text-base">
+                <Separator className="my-1.5" />
+                <div className="flex justify-between font-bold text-sm">
                   <span>Total Paid</span>
                   <span className="text-primary">₹{order.total_amount}</span>
                 </div>
@@ -289,22 +293,24 @@ export function OrderCard({ order, onReview, onReorder }: OrderCardProps) {
             </div>
 
             {/* Actions */}
-            <div className="flex flex-col sm:flex-row gap-3">
+            <div className="flex gap-2 pt-1">
               {order.status === "delivered" && (
                 <Button 
                   variant="outline" 
-                  className="flex-1"
+                  size="sm"
+                  className="flex-1 h-9"
                   onClick={() => onReview(order)}
                 >
-                  <Star className="h-4 w-4 mr-2" />
-                  Write a Review
+                  <Star className="h-3.5 w-3.5 mr-1.5" />
+                  Review
                 </Button>
               )}
               <Button 
-                className="flex-1 shadow-chip"
+                size="sm"
+                className="flex-1 h-9"
                 onClick={() => onReorder(orderItems)}
               >
-                <RotateCcw className="h-4 w-4 mr-2" />
+                <RotateCcw className="h-3.5 w-3.5 mr-1.5" />
                 Reorder
               </Button>
             </div>
