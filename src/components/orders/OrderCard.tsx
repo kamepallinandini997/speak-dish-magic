@@ -63,10 +63,10 @@ export function OrderCard({ order, onClick }: OrderCardProps) {
       )}
       onClick={onClick}
     >
-      <CardContent className="p-3">
-        <div className="flex items-center gap-3">
+      <CardContent className="p-4">
+        <div className="flex items-center gap-4">
           {/* Thumbnail Preview */}
-          <div className="flex-shrink-0 w-14 h-14 relative">
+          <div className="flex-shrink-0 w-20 h-20 relative">
             {loading ? (
               <div className="w-full h-full rounded-lg bg-muted animate-pulse" />
             ) : orderItems.length > 0 ? (
@@ -106,10 +106,10 @@ export function OrderCard({ order, onClick }: OrderCardProps) {
           <div className="flex-1 min-w-0">
             <div className="flex items-start justify-between gap-2">
               <div className="min-w-0">
-                <p className="font-semibold text-sm truncate">
+                <p className="font-semibold text-base truncate">
                   #{order.id.slice(0, 8).toUpperCase()}
                 </p>
-                <p className="text-xs text-muted-foreground">
+                <p className="text-sm text-muted-foreground">
                   {new Date(order.created_at).toLocaleDateString('en-IN', {
                     day: 'numeric',
                     month: 'short',
@@ -120,9 +120,9 @@ export function OrderCard({ order, onClick }: OrderCardProps) {
               </div>
               <OrderStatusBadge status={order.status} />
             </div>
-            <div className="flex items-center justify-between mt-1">
-              <span className="font-bold text-base text-primary">₹{order.total_amount}</span>
-              <ChevronRight className="h-4 w-4 text-muted-foreground" />
+            <div className="flex items-center justify-between mt-2">
+              <span className="font-bold text-lg text-primary">₹{order.total_amount}</span>
+              <ChevronRight className="h-5 w-5 text-muted-foreground" />
             </div>
           </div>
         </div>
