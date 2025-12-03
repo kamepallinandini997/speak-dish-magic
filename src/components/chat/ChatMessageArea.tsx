@@ -57,9 +57,9 @@ export const ChatMessageArea = ({
   }, [isListening]);
 
   return (
-    <div className="flex flex-col h-full bg-card">
+    <div className="flex flex-col h-full bg-card overflow-hidden">
       {/* Sticky Header */}
-      <div className="flex items-center justify-between px-4 py-3 border-b border-border bg-card/95 backdrop-blur-md sticky top-0 z-10 shadow-sm">
+      <div className="flex items-center justify-between px-4 py-3 border-b border-border bg-card/95 backdrop-blur-md z-10 shadow-sm flex-shrink-0">
         <div className="flex items-center gap-3 min-w-0">
           <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-primary/20 to-accent/20 flex items-center justify-center flex-shrink-0">
             <MessageSquare className="h-4 w-4 text-primary" />
@@ -103,7 +103,7 @@ export const ChatMessageArea = ({
       </div>
 
       {/* Messages */}
-      <ScrollArea className="flex-1">
+      <ScrollArea className="flex-1 overflow-hidden">
         <div className="p-4 space-y-4 min-h-full">
           {messages.length === 0 && (
             <div className="flex flex-col items-center justify-center py-16 text-center">
@@ -179,7 +179,7 @@ export const ChatMessageArea = ({
 
       {/* Recording Indicator */}
       {showRecordingIndicator && (
-        <div className="px-4 py-2 bg-primary/10 border-t border-primary/20">
+        <div className="px-4 py-2 bg-primary/10 border-t border-primary/20 flex-shrink-0">
           <div className="flex items-center gap-2 text-primary">
             <div className="w-2 h-2 rounded-full bg-primary animate-pulse" />
             <span className="text-sm font-medium">Listening...</span>
@@ -189,7 +189,7 @@ export const ChatMessageArea = ({
       )}
 
       {/* Input Area */}
-      <div className="border-t border-border p-4 bg-card">
+      <div className="border-t border-border p-4 bg-card flex-shrink-0">
         <div className="flex gap-2 items-end">
           <Button
             variant={isListening ? "default" : "outline"}
