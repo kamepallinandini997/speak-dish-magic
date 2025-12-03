@@ -36,6 +36,7 @@ import {
   Tag,
   Navigation
 } from "lucide-react";
+import { OrdersTab } from "@/components/orders/OrdersTab";
 
 interface Restaurant {
   id: string;
@@ -648,57 +649,16 @@ const Dashboard = () => {
 
               {/* Orders Tab */}
               <TabsContent value="orders" className="space-y-4">
-                {orders.length === 0 ? (
-                  <Card className="p-12 text-center">
-                    <Package className="h-16 w-16 mx-auto mb-4 text-muted-foreground" />
-                    <h3 className="text-lg font-semibold mb-2">No orders yet</h3>
-                    <p className="text-muted-foreground">Your orders will appear here</p>
-                  </Card>
-                ) : (
-                  orders.map((order) => (
-                    <Card key={order.id} className="hover:shadow-hover transition-all">
-                      <CardContent className="p-6">
-                        <div className="flex items-start justify-between mb-4">
-                          <div>
-                            <div className="flex items-center gap-2 mb-2">
-                              <h3 className="font-bold">Order #{order.id.slice(0, 8)}</h3>
-                              <Badge variant={
-                                order.status === "delivered" ? "default" :
-                                order.status === "delivering" ? "secondary" :
-                                "outline"
-                              }>
-                                {order.status}
-                              </Badge>
-                            </div>
-                            <p className="text-sm text-muted-foreground">
-                              {new Date(order.created_at).toLocaleDateString()} • ₹{order.total_amount}
-                            </p>
-                          </div>
-                          {order.status === "delivered" && (
-                            <Button 
-                              size="sm" 
-                              variant="outline"
-                              onClick={() => {
-                                setReviewOrder(order);
-                                setShowReview(true);
-                              }}
-                            >
-                              <Star className="h-4 w-4 mr-1" />
-                              Review
-                            </Button>
-                          )}
-                        </div>
-                        
-                        {order.status === "delivering" && (
-                          <div className="flex items-center gap-2 text-secondary">
-                            <Truck className="h-4 w-4 animate-pulse" />
-                            <span className="text-sm font-medium">Your order is on the way!</span>
-                          </div>
-                        )}
-                      </CardContent>
-                    </Card>
-                  ))
-                )}
+                <OrdersTab
+                  orders={orders}
+                  onReview={(order) => {
+                    setReviewOrder(order);
+                    setShowReview(true);
+                  }}
+                  onBrowseRestaurants={() => setActiveTab("home")}
+                  userId={userId}
+                  onCartUpdated={fetchCart}
+                />
               </TabsContent>
 
               {/* AI Chat Tab */}
