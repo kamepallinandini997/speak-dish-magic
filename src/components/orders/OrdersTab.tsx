@@ -1,5 +1,6 @@
 import { useState, useMemo } from "react";
 import { OrderCard } from "./OrderCard";
+import { OrderDetailModal } from "./OrderDetailModal";
 import { OrderFilters, OrderFilter, OrderSort } from "./OrderFilters";
 import { EmptyOrders } from "./EmptyOrders";
 import { useToast } from "@/hooks/use-toast";
@@ -26,13 +27,13 @@ interface OrdersTabProps {
 export function OrdersTab({ orders, onReview, onBrowseRestaurants, userId, onCartUpdated }: OrdersTabProps) {
   const [filter, setFilter] = useState<OrderFilter>("all");
   const [sort, setSort] = useState<OrderSort>("recent");
+  const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
+  const [modalOpen, setModalOpen] = useState(false);
   const { toast } = useToast();
 
-  // Filter and sort orders
   const filteredAndSortedOrders = useMemo(() => {
     let result = [...orders];
 
-    // Apply filter
     if (filter !== "all") {
       result = result.filter((order) => {
         if (filter === "pending") {
@@ -42,7 +43,6 @@ export function OrdersTab({ orders, onReview, onBrowseRestaurants, userId, onCar
       });
     }
 
-    // Apply sort
     result.sort((a, b) => {
       switch (sort) {
         case "recent":
@@ -65,7 +65,6 @@ export function OrdersTab({ orders, onReview, onBrowseRestaurants, userId, onCar
     if (!userId) return;
 
     try {
-      // Add all items to cart
       for (const item of orderItems) {
         await supabase.from("cart").insert({
           menu_item_id: item.menu_item_id,
@@ -89,13 +88,18 @@ export function OrdersTab({ orders, onReview, onBrowseRestaurants, userId, onCar
     }
   };
 
+  const handleOrderClick = (order: Order) => {
+    setSelectedOrder(order);
+    setModalOpen(true);
+  };
+
   if (orders.length === 0) {
     return <EmptyOrders onBrowseClick={onBrowseRestaurants} />;
   }
 
   return (
-    <div className="space-y-3">
-      {/* Compact Header with Filters */}
+    <div className="space-y-4">
+      {/* Header with Filters */}
       <div className="flex items-center justify-between">
         <p className="text-sm text-muted-foreground">
           {filteredAndSortedOrders.length} order{filteredAndSortedOrders.length !== 1 ? "s" : ""}
@@ -119,12 +123,20 @@ export function OrdersTab({ orders, onReview, onBrowseRestaurants, userId, onCar
             <OrderCard
               key={order.id}
               order={order}
-              onReview={onReview}
-              onReorder={handleReorder}
+              onClick={() => handleOrderClick(order)}
             />
           ))}
         </div>
       )}
+
+      {/* Order Detail Modal */}
+      <OrderDetailModal
+        order={selectedOrder}
+        open={modalOpen}
+        onOpenChange={setModalOpen}
+        onReview={onReview}
+        onReorder={handleReorder}
+      />
     </div>
   );
 }
