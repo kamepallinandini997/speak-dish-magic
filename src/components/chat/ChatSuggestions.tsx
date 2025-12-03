@@ -30,9 +30,10 @@ interface Restaurant {
 interface ChatSuggestionsProps {
   messages: { role: string; content: string }[];
   isVisible: boolean;
+  isMobileDrawer?: boolean;
 }
 
-export const ChatSuggestions = ({ messages, isVisible }: ChatSuggestionsProps) => {
+export const ChatSuggestions = ({ messages, isVisible, isMobileDrawer = false }: ChatSuggestionsProps) => {
   const [suggestedItems, setSuggestedItems] = useState<MenuItem[]>([]);
   const [suggestedRestaurants, setSuggestedRestaurants] = useState<Restaurant[]>([]);
   const [isLoading, setIsLoading] = useState(false);
@@ -181,20 +182,135 @@ export const ChatSuggestions = ({ messages, isVisible }: ChatSuggestionsProps) =
 
   if (!isVisible) return null;
 
+  // Mobile drawer variant - no outer container needed
+  if (isMobileDrawer) {
+    return (
+      <div className="p-4 space-y-6">
+        {/* Keywords */}
+        {keywords.length > 0 && (
+          <div className="flex flex-wrap gap-1.5">
+            {keywords.map((kw) => (
+              <span
+                key={kw}
+                className="text-xs px-2.5 py-1 rounded-full bg-primary/10 text-primary capitalize font-medium"
+              >
+                {kw}
+              </span>
+            ))}
+          </div>
+        )}
+
+        {/* Loading */}
+        {isLoading && (
+          <div className="space-y-4">
+            {[1, 2, 3].map((i) => (
+              <div key={i} className="flex gap-3 animate-pulse">
+                <div className="w-16 h-16 rounded-lg bg-muted" />
+                <div className="flex-1 space-y-2">
+                  <div className="h-4 w-3/4 bg-muted rounded" />
+                  <div className="h-3 w-1/2 bg-muted rounded" />
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {/* Restaurants */}
+        {!isLoading && suggestedRestaurants.length > 0 && (
+          <div>
+            <h4 className="text-sm font-medium text-muted-foreground mb-3 flex items-center gap-2">
+              <Store className="h-4 w-4" />
+              Restaurants
+            </h4>
+            <div className="grid grid-cols-2 gap-3">
+              {suggestedRestaurants.map((restaurant) => (
+                <div
+                  key={restaurant.id}
+                  className="p-3 rounded-xl bg-muted/50 hover:bg-muted transition-colors cursor-pointer"
+                >
+                  <div className="w-full h-20 rounded-lg bg-muted overflow-hidden mb-2">
+                    {restaurant.image_url ? (
+                      <img src={restaurant.image_url} alt={restaurant.name} className="w-full h-full object-cover" />
+                    ) : (
+                      <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-primary/20 to-accent/20">
+                        <Store className="h-6 w-6 text-primary" />
+                      </div>
+                    )}
+                  </div>
+                  <p className="font-medium text-sm truncate">{restaurant.name}</p>
+                  <p className="text-xs text-muted-foreground truncate">{restaurant.cuisine}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Menu Items */}
+        {!isLoading && suggestedItems.length > 0 && (
+          <div>
+            <h4 className="text-sm font-medium text-muted-foreground mb-3 flex items-center gap-2">
+              <UtensilsCrossed className="h-4 w-4" />
+              Menu Items
+            </h4>
+            <div className="space-y-3">
+              {suggestedItems.map((item) => (
+                <div key={item.id} className="flex gap-3 p-2 rounded-lg hover:bg-muted/50 transition-colors">
+                  <div className="w-16 h-16 rounded-lg bg-muted overflow-hidden flex-shrink-0">
+                    {item.image_url ? (
+                      <img src={item.image_url} alt={item.name} className="w-full h-full object-cover" />
+                    ) : (
+                      <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-primary/20 to-accent/20">
+                        <UtensilsCrossed className="h-6 w-6 text-primary" />
+                      </div>
+                    )}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="font-medium text-sm truncate">{item.name}</p>
+                    <p className="text-xs text-muted-foreground truncate">{item.restaurants?.name}</p>
+                    <div className="flex items-center justify-between mt-1">
+                      <span className="text-sm font-semibold text-primary">₹{item.price}</span>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        className="h-7 px-2 text-xs hover:bg-primary hover:text-primary-foreground"
+                        onClick={() => handleAddToCart(item)}
+                      >
+                        <Plus className="h-3 w-3 mr-1" />
+                        Add
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Empty */}
+        {!isLoading && suggestedItems.length === 0 && suggestedRestaurants.length === 0 && (
+          <div className="text-center py-8">
+            <Sparkles className="h-8 w-8 mx-auto text-muted-foreground/50 mb-2" />
+            <p className="text-sm text-muted-foreground">Start chatting to see suggestions</p>
+          </div>
+        )}
+      </div>
+    );
+  }
+
   return (
     <div className="hidden xl:flex flex-col w-80 border-l border-border bg-card/50">
       {/* Header */}
-      <div className="p-4 border-b border-border">
+      <div className="p-4 border-b border-border sticky top-0 bg-card/95 backdrop-blur-md z-10">
         <h3 className="font-semibold text-foreground flex items-center gap-2">
           <Sparkles className="h-5 w-5 text-primary" />
           Suggested for you
         </h3>
         {keywords.length > 0 && (
           <div className="flex flex-wrap gap-1 mt-2">
-            {keywords.slice(0, 3).map((kw) => (
+            {keywords.map((kw) => (
               <span
                 key={kw}
-                className="text-xs px-2 py-0.5 rounded-full bg-primary/10 text-primary capitalize"
+                className="text-xs px-2 py-0.5 rounded-full bg-primary/10 text-primary capitalize font-medium animate-in fade-in-0 zoom-in-95"
               >
                 {kw}
               </span>

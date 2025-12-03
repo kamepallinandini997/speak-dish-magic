@@ -2,7 +2,7 @@ import { useRef, useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Mic, MicOff, Send, Volume2, VolumeX, Loader2, Square } from "lucide-react";
+import { Mic, MicOff, Send, Volume2, VolumeX, Loader2, Square, Plus, MessageSquare } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { format } from "date-fns";
 
@@ -20,11 +20,13 @@ interface ChatMessageAreaProps {
   isListening: boolean;
   isSpeaking: boolean;
   voiceEnabled: boolean;
+  chatTitle: string;
   onSendMessage: () => void;
   onStartListening: () => void;
   onStopListening: () => void;
   onToggleVoice: () => void;
   onStopSpeaking: () => void;
+  onNewChat: () => void;
 }
 
 export const ChatMessageArea = ({
@@ -35,11 +37,13 @@ export const ChatMessageArea = ({
   isListening,
   isSpeaking,
   voiceEnabled,
+  chatTitle,
   onSendMessage,
   onStartListening,
   onStopListening,
   onToggleVoice,
   onStopSpeaking,
+  onNewChat,
 }: ChatMessageAreaProps) => {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const [showRecordingIndicator, setShowRecordingIndicator] = useState(false);
@@ -54,19 +58,26 @@ export const ChatMessageArea = ({
 
   return (
     <div className="flex flex-col h-full bg-card">
-      {/* Header */}
-      <div className="flex items-center justify-between p-4 border-b border-border bg-card/80 backdrop-blur-sm">
-        <div>
-          <h3 className="font-semibold text-foreground">AI Food Assistant</h3>
-          <p className="text-xs text-muted-foreground">Ask me about restaurants & dishes</p>
+      {/* Sticky Header */}
+      <div className="flex items-center justify-between px-4 py-3 border-b border-border bg-card/95 backdrop-blur-md sticky top-0 z-10 shadow-sm">
+        <div className="flex items-center gap-3 min-w-0">
+          <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-primary/20 to-accent/20 flex items-center justify-center flex-shrink-0">
+            <MessageSquare className="h-4 w-4 text-primary" />
+          </div>
+          <div className="min-w-0">
+            <h3 className="font-semibold text-foreground text-sm truncate max-w-[200px] sm:max-w-[300px]">
+              {chatTitle || "New Chat"}
+            </h3>
+            <p className="text-xs text-muted-foreground">AI Food Assistant</p>
+          </div>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-shrink-0">
           {isSpeaking && (
             <Button
               variant="outline"
               size="sm"
               onClick={onStopSpeaking}
-              className="text-primary animate-pulse"
+              className="text-primary animate-pulse h-8"
             >
               <Square className="h-3 w-3 mr-1" />
               Stop
@@ -76,13 +87,17 @@ export const ChatMessageArea = ({
             variant="outline"
             size="sm"
             onClick={onToggleVoice}
-            className={cn(voiceEnabled && "text-primary")}
+            className={cn("h-8 w-8 p-0", voiceEnabled && "text-primary border-primary/50")}
           >
-            {voiceEnabled ? (
-              <Volume2 className="h-4 w-4" />
-            ) : (
-              <VolumeX className="h-4 w-4" />
-            )}
+            {voiceEnabled ? <Volume2 className="h-4 w-4" /> : <VolumeX className="h-4 w-4" />}
+          </Button>
+          <Button
+            onClick={onNewChat}
+            size="sm"
+            className="h-8 gap-1.5 bg-gradient-to-r from-primary to-accent text-primary-foreground shadow-md"
+          >
+            <Plus className="h-3.5 w-3.5" />
+            <span className="hidden sm:inline">New</span>
           </Button>
         </div>
       </div>

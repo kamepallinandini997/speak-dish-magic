@@ -7,6 +7,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { ChatSidebar } from "@/components/chat/ChatSidebar";
 import { ChatMessageArea } from "@/components/chat/ChatMessageArea";
 import { ChatSuggestions } from "@/components/chat/ChatSuggestions";
+import { MobileSuggestionsDrawer } from "@/components/chat/MobileSuggestionsDrawer";
 import { useIsMobile } from "@/hooks/use-mobile";
 
 interface Message {
@@ -412,17 +413,22 @@ export const VoiceChat = ({ isActive }: VoiceChatProps) => {
             isListening={isListening}
             isSpeaking={isSpeaking}
             voiceEnabled={voiceEnabled}
+            chatTitle={sessions.find(s => s.id === sessionId)?.title || "New Chat"}
             onSendMessage={handleSendMessage}
             onStartListening={startListening}
             onStopListening={stopListening}
             onToggleVoice={handleToggleVoice}
             onStopSpeaking={stopSpeaking}
+            onNewChat={() => createNewSession()}
           />
         </div>
 
-        {/* Right Panel - Suggestions */}
+        {/* Right Panel - Suggestions (Desktop) */}
         <ChatSuggestions messages={messages} isVisible={!isMobile} />
       </div>
+
+      {/* Mobile Suggestions Drawer */}
+      {isMobile && <MobileSuggestionsDrawer messages={messages} />}
     </>
   );
 };
