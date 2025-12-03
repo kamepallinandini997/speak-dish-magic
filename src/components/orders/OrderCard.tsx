@@ -1,7 +1,6 @@
 import { useState, useEffect } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { OrderStatusBadge } from "./OrderStatusBadge";
 import { supabase } from "@/integrations/supabase/client";
 import { RotateCcw, Navigation, Package } from "lucide-react";
 
@@ -36,6 +35,15 @@ interface OrderCardProps {
   onClick: () => void;
   onReorder: (orderItems: OrderItem[]) => void;
 }
+
+const statusLabels: Record<string, string> = {
+  pending: "Pending",
+  confirmed: "Confirmed",
+  preparing: "Preparing",
+  delivering: "Out for Delivery",
+  delivered: "Delivered",
+  cancelled: "Cancelled",
+};
 
 export function OrderCard({ order, onClick, onReorder }: OrderCardProps) {
   const [orderItems, setOrderItems] = useState<OrderItem[]>([]);
@@ -74,7 +82,8 @@ export function OrderCard({ order, onClick, onReorder }: OrderCardProps) {
 
   const totalItems = orderItems.reduce((sum, item) => sum + item.quantity, 0);
   const isActiveOrder = ["pending", "confirmed", "preparing", "delivering"].includes(order.status);
-  const firstItemImage = orderItems[0]?.menu_items?.image_url;
+  const thumbnails = orderItems.slice(0, 4);
+  const hasMultipleItems = orderItems.length > 1;
 
   return (
     <Card 
@@ -82,24 +91,57 @@ export function OrderCard({ order, onClick, onReorder }: OrderCardProps) {
       onClick={onClick}
     >
       <CardContent className="p-4 flex flex-col h-full">
-        {/* Top Section: Image + Info */}
+        {/* Top Section: Images + Info */}
         <div className="flex gap-3 flex-1">
-          {/* Item Image - Rectangular */}
-          <div className="flex-shrink-0 w-[72px] h-[72px] rounded-lg overflow-hidden bg-muted">
+          {/* Item Thumbnails */}
+          <div className="flex-shrink-0">
             {loading ? (
-              <div className="w-full h-full animate-pulse bg-muted" />
-            ) : firstItemImage ? (
-              <img
-                src={firstItemImage}
-                alt="Order item"
-                className="w-full h-full object-cover"
-                onError={(e) => {
-                  e.currentTarget.src = "https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=200";
-                }}
-              />
+              <div className="w-[72px] h-[72px] rounded-lg animate-pulse bg-muted" />
+            ) : hasMultipleItems ? (
+              <div className="grid grid-cols-2 gap-1 w-[72px] h-[72px]">
+                {thumbnails.map((item, index) => (
+                  <div 
+                    key={item.id} 
+                    className="rounded overflow-hidden bg-muted relative"
+                  >
+                    {item.menu_items?.image_url ? (
+                      <img
+                        src={item.menu_items.image_url}
+                        alt={item.item_name}
+                        className="w-full h-full object-cover"
+                        onError={(e) => {
+                          e.currentTarget.src = "https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=100";
+                        }}
+                      />
+                    ) : (
+                      <div className="w-full h-full flex items-center justify-center">
+                        <Package className="h-3 w-3 text-muted-foreground" />
+                      </div>
+                    )}
+                    {index === 3 && orderItems.length > 4 && (
+                      <div className="absolute inset-0 bg-black/50 flex items-center justify-center">
+                        <span className="text-white text-[10px] font-medium">+{orderItems.length - 4}</span>
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
             ) : (
-              <div className="w-full h-full flex items-center justify-center bg-muted">
-                <Package className="h-6 w-6 text-muted-foreground" />
+              <div className="w-[72px] h-[72px] rounded-lg overflow-hidden bg-muted">
+                {orderItems[0]?.menu_items?.image_url ? (
+                  <img
+                    src={orderItems[0].menu_items.image_url}
+                    alt="Order item"
+                    className="w-full h-full object-cover"
+                    onError={(e) => {
+                      e.currentTarget.src = "https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=200";
+                    }}
+                  />
+                ) : (
+                  <div className="w-full h-full flex items-center justify-center">
+                    <Package className="h-6 w-6 text-muted-foreground" />
+                  </div>
+                )}
               </div>
             )}
           </div>
@@ -134,9 +176,11 @@ export function OrderCard({ order, onClick, onReorder }: OrderCardProps) {
           </div>
         </div>
 
-        {/* Status Badge - with soft tint */}
+        {/* Status - neutral text */}
         <div className="mt-3">
-          <OrderStatusBadge status={order.status} className="text-xs py-1 px-2.5" />
+          <span className="text-xs font-medium text-muted-foreground bg-muted px-2.5 py-1 rounded-full">
+            {statusLabels[order.status] || order.status}
+          </span>
         </div>
 
         {/* Action Buttons */}
