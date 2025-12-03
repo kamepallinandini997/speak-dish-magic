@@ -118,12 +118,13 @@ export function OrdersTab({ orders, onReview, onBrowseRestaurants, userId, onCar
           <p className="text-sm text-muted-foreground">No orders match your filter</p>
         </div>
       ) : (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 w-full">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 w-full">
           {filteredAndSortedOrders.map((order) => (
             <OrderCard
               key={order.id}
               order={order}
               onClick={() => handleOrderClick(order)}
+              onReorder={handleReorder}
             />
           ))}
         </div>
