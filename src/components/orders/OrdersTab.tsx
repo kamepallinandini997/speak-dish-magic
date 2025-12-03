@@ -108,13 +108,13 @@ export function OrdersTab({ orders, onReview, onBrowseRestaurants, userId, onCar
         />
       </div>
 
-      {/* Orders List */}
+      {/* Orders Grid */}
       {filteredAndSortedOrders.length === 0 ? (
         <div className="text-center py-8">
           <p className="text-sm text-muted-foreground">No orders match your filter</p>
         </div>
       ) : (
-        <div className="space-y-2.5">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 w-full">
           {filteredAndSortedOrders.map((order) => (
             <OrderCard
               key={order.id}
