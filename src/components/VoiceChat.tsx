@@ -391,7 +391,7 @@ export const VoiceChat = ({ isActive }: VoiceChatProps) => {
       )}
       
       {/* Three-Panel Layout */}
-      <div className="flex h-[calc(100vh-200px)] min-h-[500px] bg-background rounded-xl border border-border shadow-soft overflow-hidden">
+      <div className="flex h-[600px] md:h-[calc(100vh-180px)] md:min-h-[500px] bg-background rounded-xl border border-border shadow-soft overflow-hidden">
         {/* Left Sidebar - Chat History */}
         <ChatSidebar
           sessions={sessions}
