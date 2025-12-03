@@ -106,7 +106,7 @@ export function OrderCard({ order, onReview, onReorder }: OrderCardProps) {
   return (
     <Collapsible open={isOpen} onOpenChange={setIsOpen}>
       <Card className={cn(
-        "transition-all duration-300 hover:shadow-md overflow-hidden bg-card",
+        "transition-all duration-300 hover:shadow-md overflow-hidden bg-card h-fit w-full rounded-xl border border-border/50 shadow-sm",
         isOpen && "shadow-lg ring-1 ring-primary/10"
       )}>
         <CollapsibleTrigger asChild>
