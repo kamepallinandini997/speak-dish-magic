@@ -8,6 +8,7 @@ import { ChatSidebar } from "@/components/chat/ChatSidebar";
 import { ChatMessageArea } from "@/components/chat/ChatMessageArea";
 import { ChatSuggestions } from "@/components/chat/ChatSuggestions";
 import { MobileSuggestionsDrawer } from "@/components/chat/MobileSuggestionsDrawer";
+import { PaymentAuth } from "@/components/PaymentAuth";
 import { useIsMobile } from "@/hooks/use-mobile";
 
 interface Message {
@@ -39,11 +40,14 @@ export const VoiceChat = ({ isActive }: VoiceChatProps) => {
   const [sessionId, setSessionId] = useState<string | null>(null);
   const [showCheckout, setShowCheckout] = useState(false);
   const [checkoutData, setCheckoutData] = useState<any>(null);
-  const [sidebarCollapsed, setSidebarCollapsed] = useState(true);
+  const [showPaymentAuth, setShowPaymentAuth] = useState(false);
+  const [pendingOrder, setPendingOrder] = useState<any>(null);
+  const isMobile = useIsMobile();
+  // Sidebar visible by default on desktop, collapsed on mobile
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const { toast } = useToast();
   const recognitionRef = useRef<any>(null);
   const utteranceRef = useRef<SpeechSynthesisUtterance | null>(null);
-  const isMobile = useIsMobile();
 
   // Initialize speech recognition and load user data
   useEffect(() => {
@@ -71,10 +75,11 @@ export const VoiceChat = ({ isActive }: VoiceChatProps) => {
       };
     }
 
-    // Get current user
+    // Get current user and load sessions (only once)
     supabase.auth.getSession().then(async ({ data: { session } }) => {
       if (session) {
         setUserId(session.user.id);
+        // Load sessions - they will persist across tab switches
         await loadSessions(session.user.id);
       }
     });
@@ -86,7 +91,7 @@ export const VoiceChat = ({ isActive }: VoiceChatProps) => {
     };
   }, [toast]);
 
-  // Stop voice when tab changes
+  // Stop voice when tab changes (but don't clear sessions)
   useEffect(() => {
     if (!isActive) {
       stopSpeaking();
@@ -95,6 +100,16 @@ export const VoiceChat = ({ isActive }: VoiceChatProps) => {
       }
     }
   }, [isActive, isListening]);
+
+  // Reload sessions when component becomes active (only if sessions are empty and userId exists)
+  useEffect(() => {
+    if (isActive && userId && sessions.length === 0) {
+      loadSessions(userId).catch((error) => {
+        console.error("Error loading sessions:", error);
+      });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isActive, userId]); // Reload when tab becomes active and we have a userId but no sessions
 
   // Load all chat sessions for user
   const loadSessions = async (uid: string) => {
@@ -133,7 +148,10 @@ export const VoiceChat = ({ isActive }: VoiceChatProps) => {
 
   const createNewSession = async (uid?: string) => {
     const userIdToUse = uid || userId;
-    if (!userIdToUse) return;
+    if (!userIdToUse) {
+      console.error("Cannot create session: no userId");
+      return;
+    }
 
     const { data, error } = await supabase
       .from("chat_sessions")
@@ -141,7 +159,17 @@ export const VoiceChat = ({ isActive }: VoiceChatProps) => {
       .select()
       .single();
 
-    if (!error && data) {
+    if (error) {
+      console.error("Error creating session:", error);
+      toast({
+        title: "Error",
+        description: "Failed to create new chat session",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (data) {
       setSessionId(data.id);
       setMessages([]);
       const newSession = { ...data, title: "New Conversation" };
@@ -177,12 +205,17 @@ export const VoiceChat = ({ isActive }: VoiceChatProps) => {
   const saveChatMessage = async (message: Message) => {
     if (!userId || !sessionId) return;
 
-    await supabase.from("chat_messages").insert({
+    const { error } = await supabase.from("chat_messages").insert({
       user_id: userId,
       session_id: sessionId,
       role: message.role,
       content: message.content,
     });
+
+    if (error) {
+      console.error("Error saving chat message:", error);
+      return;
+    }
 
     // Update session's updated_at
     await supabase
@@ -202,22 +235,59 @@ export const VoiceChat = ({ isActive }: VoiceChatProps) => {
   const clearAllSessions = async () => {
     if (!userId) return;
 
-    // Delete all messages first
-    await supabase.from("chat_messages").delete().eq("user_id", userId);
-    // Delete all sessions
-    await supabase.from("chat_sessions").delete().eq("user_id", userId);
+    try {
+      // Delete all messages first (backend deletion)
+      const { error: messagesError } = await supabase
+        .from("chat_messages")
+        .delete()
+        .eq("user_id", userId);
+      
+      if (messagesError) {
+        console.error("Error deleting messages:", messagesError);
+        toast({
+          title: "Error",
+          description: "Failed to delete some messages",
+          variant: "destructive",
+        });
+        return;
+      }
 
-    setSessions([]);
-    setMessages([]);
-    setSessionId(null);
+      // Delete all sessions (backend deletion)
+      const { error: sessionsError } = await supabase
+        .from("chat_sessions")
+        .delete()
+        .eq("user_id", userId);
+      
+      if (sessionsError) {
+        console.error("Error deleting sessions:", sessionsError);
+        toast({
+          title: "Error",
+          description: "Failed to delete some sessions",
+          variant: "destructive",
+        });
+        return;
+      }
 
-    // Create a new session
-    await createNewSession();
+      // Clear frontend state
+      setSessions([]);
+      setMessages([]);
+      setSessionId(null);
 
-    toast({
-      title: "Chats cleared",
-      description: "All your chat history has been deleted",
-    });
+      // Create a new session
+      await createNewSession();
+
+      toast({
+        title: "Chats cleared",
+        description: "All your chat history has been permanently deleted",
+      });
+    } catch (error: any) {
+      console.error("Error clearing sessions:", error);
+      toast({
+        title: "Error",
+        description: "Failed to clear chat history. Please try again.",
+        variant: "destructive",
+      });
+    }
   };
 
   const stopSpeaking = useCallback(() => {
@@ -231,9 +301,13 @@ export const VoiceChat = ({ isActive }: VoiceChatProps) => {
     if ('speechSynthesis' in window && voiceEnabled) {
       stopSpeaking();
       
-      // Clean text from special symbols and emojis for TTS
+      // Clean text from special symbols, markdown, and emojis for TTS
       const cleanText = text
+        // Remove markdown syntax
         .replace(/[*_~`#\[\](){}]/g, '')
+        // Remove special symbols
+        .replace(/[!@#$%^&*(),.?":{}|<>]/g, '')
+        // Remove emojis (all ranges)
         .replace(/[\u{1F600}-\u{1F64F}]/gu, '')
         .replace(/[\u{1F300}-\u{1F5FF}]/gu, '')
         .replace(/[\u{1F680}-\u{1F6FF}]/gu, '')
@@ -244,6 +318,8 @@ export const VoiceChat = ({ isActive }: VoiceChatProps) => {
         .replace(/[\u{1F900}-\u{1F9FF}]/gu, '')
         .replace(/[\u{1FA00}-\u{1FA6F}]/gu, '')
         .replace(/[\u{1FA70}-\u{1FAFF}]/gu, '')
+        // Remove newlines and extra spaces
+        .replace(/\n+/g, ' ')
         .replace(/\s+/g, ' ')
         .trim();
       
@@ -295,12 +371,40 @@ export const VoiceChat = ({ isActive }: VoiceChatProps) => {
     setIsListening(false);
   }, []);
 
-  const handleSendMessage = useCallback(async () => {
-    if (!inputText.trim() || isProcessing) return;
+  const handleSendMessage = useCallback(async (customMessage?: string) => {
+    const messageToSend = customMessage || inputText;
+    if (!messageToSend.trim() || isProcessing) {
+      console.log("Cannot send: empty message or processing", { messageToSend, isProcessing });
+      return;
+    }
+
+    if (!userId) {
+      toast({
+        title: "Error",
+        description: "Please log in to send messages",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (!sessionId) {
+      console.log("No session ID, creating new session...");
+      await createNewSession();
+      // Wait a bit for session to be created
+      await new Promise(resolve => setTimeout(resolve, 100));
+      if (!sessionId) {
+        toast({
+          title: "Error",
+          description: "Failed to create chat session",
+          variant: "destructive",
+        });
+        return;
+      }
+    }
 
     const userMessage: Message = { 
       role: "user", 
-      content: inputText,
+      content: messageToSend,
       timestamp: new Date().toISOString()
     };
     setMessages((prev) => [...prev, userMessage]);
@@ -312,10 +416,14 @@ export const VoiceChat = ({ isActive }: VoiceChatProps) => {
       const { data, error } = await supabase.functions.invoke("chat", {
         body: { 
           messages: [...messages, userMessage],
+          userId: userId,
         },
       });
 
-      if (error) throw error;
+      if (error) {
+        console.error("Chat function error:", error);
+        throw error;
+      }
 
       const assistantMessage: Message = {
         role: "assistant",
@@ -327,6 +435,13 @@ export const VoiceChat = ({ isActive }: VoiceChatProps) => {
       await saveChatMessage(assistantMessage);
       speak(assistantMessage.content);
 
+      // Handle payment requirement
+      if (data.requiresPayment && data.orderData) {
+        setPendingOrder(data.orderData);
+        setShowPaymentAuth(true);
+      }
+
+      // Handle checkout trigger
       if (data.response?.toLowerCase().includes("proceed to checkout") || 
           data.response?.toLowerCase().includes("ready to order")) {
         setCheckoutData({ total: 0 });
@@ -341,7 +456,7 @@ export const VoiceChat = ({ isActive }: VoiceChatProps) => {
     } finally {
       setIsProcessing(false);
     }
-  }, [inputText, isProcessing, messages, speak, toast]);
+  }, [inputText, isProcessing, messages, speak, toast, userId]);
 
   const handleToggleVoice = useCallback(() => {
     setVoiceEnabled((prev) => {
@@ -358,8 +473,61 @@ export const VoiceChat = ({ isActive }: VoiceChatProps) => {
     setShowCheckout(false);
   };
 
+  const handlePaymentAuth = async (method: "pin" | "biometric", pin?: string): Promise<boolean> => {
+    // In production, verify PIN against stored hash or use WebAuthn
+    // For now, accept any 4-6 digit PIN or biometric
+    if (method === "pin" && pin) {
+      if (pin.length >= 4 && pin.length <= 6) {
+        // Mock verification - in production, verify against stored hash
+        await new Promise(resolve => setTimeout(resolve, 500));
+        
+        if (pendingOrder) {
+          // Complete the order
+          toast({
+            title: "Payment Verified! ✅",
+            description: "Your order has been confirmed.",
+          });
+          setShowPaymentAuth(false);
+          setPendingOrder(null);
+          return true;
+        }
+        return true;
+      }
+      return false;
+    }
+
+    if (method === "biometric") {
+      // Mock biometric verification
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      
+      if (pendingOrder) {
+        toast({
+          title: "Payment Verified! ✅",
+          description: "Your order has been confirmed.",
+        });
+        setShowPaymentAuth(false);
+        setPendingOrder(null);
+        return true;
+      }
+      return true;
+    }
+
+    return false;
+  };
+
   return (
     <>
+      {/* Payment Authentication Modal */}
+      <PaymentAuth
+        open={showPaymentAuth}
+        onAuthenticate={handlePaymentAuth}
+        onCancel={() => {
+          setShowPaymentAuth(false);
+          setPendingOrder(null);
+        }}
+        orderTotal={pendingOrder?.total_amount}
+      />
+
       {/* Checkout Modal */}
       {showCheckout && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
@@ -424,11 +592,36 @@ export const VoiceChat = ({ isActive }: VoiceChatProps) => {
         </div>
 
         {/* Right Panel - Suggestions (Desktop) */}
-        <ChatSuggestions messages={messages} isVisible={!isMobile} />
+        <ChatSuggestions 
+          messages={messages} 
+          isVisible={!isMobile}
+          onRestaurantClick={async (restaurant) => {
+            // Send a message to chat about this restaurant
+            const message = `Show me the menu from ${restaurant.name}`;
+            await handleSendMessage(message);
+          }}
+          onItemClick={async (item) => {
+            // Send a message to add item to cart
+            const message = `Add ${item.name} to cart`;
+            await handleSendMessage(message);
+          }}
+        />
       </div>
 
       {/* Mobile Suggestions Drawer */}
-      {isMobile && <MobileSuggestionsDrawer messages={messages} />}
+      {isMobile && (
+        <MobileSuggestionsDrawer 
+          messages={messages}
+          onRestaurantClick={async (restaurant) => {
+            const message = `Show me the menu from ${restaurant.name}`;
+            await handleSendMessage(message);
+          }}
+          onItemClick={async (item) => {
+            const message = `Add ${item.name} to cart`;
+            await handleSendMessage(message);
+          }}
+        />
+      )}
     </>
   );
 };

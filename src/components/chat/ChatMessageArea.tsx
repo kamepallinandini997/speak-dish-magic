@@ -21,7 +21,7 @@ interface ChatMessageAreaProps {
   isSpeaking: boolean;
   voiceEnabled: boolean;
   chatTitle: string;
-  onSendMessage: () => void;
+  onSendMessage: (customMessage?: string) => void;
   onStartListening: () => void;
   onStopListening: () => void;
   onToggleVoice: () => void;

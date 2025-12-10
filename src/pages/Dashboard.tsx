@@ -134,7 +134,7 @@ const Dashboard = () => {
   const subscribeToOrders = () => {
     if (!userId) return;
 
-    const channel = supabase
+    const ordersChannel = supabase
       .channel('user-orders')
       .on(
         'postgres_changes',
@@ -157,8 +157,27 @@ const Dashboard = () => {
       )
       .subscribe();
 
+    // Subscribe to cart changes for real-time updates
+    const cartChannel = supabase
+      .channel('user-cart')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'cart',
+          filter: `user_id=eq.${userId}`
+        },
+        (payload) => {
+          console.log('Cart updated:', payload);
+          fetchCart(); // Refresh cart when changes occur
+        }
+      )
+      .subscribe();
+
     return () => {
-      supabase.removeChannel(channel);
+      supabase.removeChannel(ordersChannel);
+      supabase.removeChannel(cartChannel);
     };
   };
 
@@ -174,10 +193,18 @@ const Dashboard = () => {
   };
 
   const fetchCart = async () => {
-    const { data } = await supabase
+    if (!userId) return;
+    
+    const { data, error } = await supabase
       .from("cart")
       .select("*, menu_items(*)")
+      .eq("user_id", userId)
       .order("created_at", { ascending: false });
+    
+    if (error) {
+      console.error("Error fetching cart:", error);
+      return;
+    }
     
     if (data) setCartItems(data);
   };
@@ -848,7 +875,13 @@ const Dashboard = () => {
       </main>
 
       {/* Cart Dialog */}
-      <Dialog open={showCart} onOpenChange={setShowCart}>
+      <Dialog open={showCart} onOpenChange={(open) => {
+        setShowCart(open);
+        // Refresh cart when modal opens
+        if (open && userId) {
+          fetchCart();
+        }
+      }}>
         <DialogContent className="max-w-md">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">

@@ -12,9 +12,15 @@ interface Message {
 
 interface MobileSuggestionsDrawerProps {
   messages: Message[];
+  onRestaurantClick?: (restaurant: any) => void;
+  onItemClick?: (item: any) => void;
 }
 
-export const MobileSuggestionsDrawer = ({ messages }: MobileSuggestionsDrawerProps) => {
+export const MobileSuggestionsDrawer = ({ 
+  messages, 
+  onRestaurantClick, 
+  onItemClick 
+}: MobileSuggestionsDrawerProps) => {
   const [open, setOpen] = useState(false);
 
   return (
@@ -38,7 +44,13 @@ export const MobileSuggestionsDrawer = ({ messages }: MobileSuggestionsDrawerPro
           </SheetTitle>
         </SheetHeader>
         <ScrollArea className="h-[calc(70vh-60px)]">
-          <ChatSuggestions messages={messages} isVisible={true} isMobileDrawer={true} />
+          <ChatSuggestions 
+            messages={messages} 
+            isVisible={true} 
+            isMobileDrawer={true}
+            onRestaurantClick={onRestaurantClick}
+            onItemClick={onItemClick}
+          />
         </ScrollArea>
       </SheetContent>
     </Sheet>

@@ -31,9 +31,17 @@ interface ChatSuggestionsProps {
   messages: { role: string; content: string }[];
   isVisible: boolean;
   isMobileDrawer?: boolean;
+  onRestaurantClick?: (restaurant: Restaurant) => void;
+  onItemClick?: (item: MenuItem) => void;
 }
 
-export const ChatSuggestions = ({ messages, isVisible, isMobileDrawer = false }: ChatSuggestionsProps) => {
+export const ChatSuggestions = ({ 
+  messages, 
+  isVisible, 
+  isMobileDrawer = false,
+  onRestaurantClick,
+  onItemClick
+}: ChatSuggestionsProps) => {
   const [suggestedItems, setSuggestedItems] = useState<MenuItem[]>([]);
   const [suggestedRestaurants, setSuggestedRestaurants] = useState<Restaurant[]>([]);
   const [isLoading, setIsLoading] = useState(false);
@@ -43,20 +51,71 @@ export const ChatSuggestions = ({ messages, isVisible, isMobileDrawer = false }:
   // Extract keywords from conversation
   useEffect(() => {
     const extractKeywords = () => {
-      const foodKeywords = [
-        "biryani", "pizza", "burger", "chicken", "mutton", "paneer", "veg", "non-veg",
-        "chinese", "indian", "italian", "south indian", "north indian", "hyderabadi",
-        "spicy", "mild", "dessert", "sweet", "drink", "beverage", "rice", "roti",
-        "naan", "curry", "kebab", "tandoori", "fried", "grilled", "healthy", "salad",
-        "paradise", "bawarchi", "shah ghouse", "pista house", "meghana"
-      ];
-
       const conversationText = messages
         .map((m) => m.content.toLowerCase())
         .join(" ");
 
-      const found = foodKeywords.filter((kw) => conversationText.includes(kw));
-      setKeywords(found);
+      const keywords: string[] = [];
+
+      // Restaurant names
+      const restaurantNames = [
+        "paradise biryani", "paradise", "dominos pizza", "dominos", "subway",
+        "kfc", "sushi palace", "bawarchi", "shah ghouse", "pista house", "meghana"
+      ];
+      restaurantNames.forEach(name => {
+        if (conversationText.includes(name)) {
+          keywords.push(name);
+        }
+      });
+
+      // Cuisine types
+      const cuisines = [
+        "chinese", "indian", "italian", "south indian", "north indian",
+        "hyderabadi", "japanese", "american", "mexican", "thai", "korean"
+      ];
+      cuisines.forEach(cuisine => {
+        if (conversationText.includes(cuisine)) {
+          keywords.push(cuisine);
+        }
+      });
+
+      // Cooking styles
+      const cookingStyles = [
+        "grilled", "fried", "tandoori", "steamed", "roasted", "baked",
+        "curry", "kebab", "biryani", "tikka", "masala"
+      ];
+      cookingStyles.forEach(style => {
+        if (conversationText.includes(style)) {
+          keywords.push(style);
+        }
+      });
+
+      // Dietary preferences
+      const dietaryPrefs = [
+        "veg", "vegetarian", "non-veg", "non vegetarian", "vegan",
+        "gluten-free", "spicy", "mild", "healthy"
+      ];
+      dietaryPrefs.forEach(pref => {
+        if (conversationText.includes(pref)) {
+          keywords.push(pref);
+        }
+      });
+
+      // Food categories
+      const categories = [
+        "biryani", "pizza", "burger", "sushi", "roll", "sub", "sandwich",
+        "chicken", "mutton", "paneer", "dessert", "sweet", "drink", "beverage",
+        "rice", "roti", "naan", "salad", "soup", "appetizer", "main course"
+      ];
+      categories.forEach(category => {
+        if (conversationText.includes(category)) {
+          keywords.push(category);
+        }
+      });
+
+      // Remove duplicates and set
+      const uniqueKeywords = Array.from(new Set(keywords));
+      setKeywords(uniqueKeywords);
     };
 
     extractKeywords();
@@ -102,24 +161,38 @@ export const ChatSuggestions = ({ messages, isVisible, isMobileDrawer = false }:
           .select("*, restaurants(name)")
           .eq("is_available", true);
 
-        // Build OR conditions for keywords
-        const keywordConditions = keywords
-          .map((kw) => `name.ilike.%${kw}%,category.ilike.%${kw}%,description.ilike.%${kw}%`)
-          .join(",");
+        // Build search conditions for menu items
+        // Try to match by name, category, description, or dietary preferences
+        const itemConditions: string[] = [];
+        keywords.forEach((kw) => {
+          itemConditions.push(`name.ilike.%${kw}%`);
+          itemConditions.push(`category.ilike.%${kw}%`);
+          itemConditions.push(`description.ilike.%${kw}%`);
+          
+          // Handle dietary preferences
+          if (kw === 'veg' || kw === 'vegetarian') {
+            itemConditions.push(`is_vegetarian.eq.true`);
+          }
+          if (kw === 'non-veg' || kw === 'non vegetarian') {
+            itemConditions.push(`is_vegetarian.eq.false`);
+          }
+        });
 
         const { data: items } = await itemsQuery
-          .or(keywordConditions)
+          .or(itemConditions.join(','))
           .limit(8);
 
-        // Search for restaurants
-        const restaurantConditions = keywords
-          .map((kw) => `name.ilike.%${kw}%,cuisine.ilike.%${kw}%`)
-          .join(",");
+        // Search for restaurants by name or cuisine
+        const restaurantConditions: string[] = [];
+        keywords.forEach((kw) => {
+          restaurantConditions.push(`name.ilike.%${kw}%`);
+          restaurantConditions.push(`cuisine.ilike.%${kw}%`);
+        });
 
         const { data: restaurants } = await supabase
           .from("restaurants")
           .select("*")
-          .or(restaurantConditions)
+          .or(restaurantConditions.join(','))
           .limit(4);
 
         setSuggestedItems(items || []);
@@ -348,6 +421,11 @@ export const ChatSuggestions = ({ messages, isVisible, isMobileDrawer = false }:
                   <div
                     key={restaurant.id}
                     className="flex items-center gap-3 p-2 rounded-lg hover:bg-muted/50 transition-colors cursor-pointer group"
+                    onClick={() => {
+                      if (onRestaurantClick) {
+                        onRestaurantClick(restaurant);
+                      }
+                    }}
                   >
                     <div className="w-12 h-12 rounded-lg bg-muted overflow-hidden flex-shrink-0">
                       {restaurant.image_url ? (

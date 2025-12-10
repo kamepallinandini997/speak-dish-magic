@@ -1,4 +1,7 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+import { SupervisorNode } from './supervisor.ts';
+import { getUserMemory } from './memory.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -16,7 +19,7 @@ serve(async (req) => {
   }
 
   try {
-    const { messages } = await req.json();
+    const { messages, userId } = await req.json();
     
     // Input validation
     if (!Array.isArray(messages)) {
@@ -42,17 +45,114 @@ serve(async (req) => {
       throw new Error('LOVABLE_API_KEY is not configured');
     }
 
-    // Check if user is asking to place an order
-    const lastUserMessage = messages.filter((m: Message) => m.role === 'user').slice(-1)[0]?.content || '';
-    const isOrderRequest = lastUserMessage.toLowerCase().includes('place') && 
-                          (lastUserMessage.toLowerCase().includes('order') || lastUserMessage.toLowerCase().includes('this'));
+    // Get Supabase client
+    const supabaseUrl = Deno.env.get('SUPABASE_URL') || '';
+    const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
     
-    // Count previous "place order" requests
-    const previousOrderRequests = messages.filter((m: Message) => 
-      m.role === 'user' && 
-      m.content.toLowerCase().includes('place') && 
-      (m.content.toLowerCase().includes('order') || m.content.toLowerCase().includes('this'))
-    ).length;
+    if (!supabaseUrl || !supabaseKey) {
+      throw new Error('Supabase configuration missing');
+    }
+
+    const supabase = createClient(supabaseUrl, supabaseKey);
+
+    // Get last user message and filter out identity inference
+    let lastUserMessage = messages.filter((m: Message) => m.role === 'user').slice(-1)[0]?.content || '';
+    
+    // Filter out common names that might be mistaken for user identity
+    // This prevents the bot from inferring user identity from message text
+    const commonNames = [
+      'alia', 'bhatt', 'shahrukh', 'khan', 'amitabh', 'bachchan',
+      'priyanka', 'chopra', 'deepika', 'padukone', 'ranbir', 'kapoor'
+    ];
+    
+    // Remove name patterns that might be mistaken for identity
+    // (This is a simple filter - in production, use more sophisticated NLP)
+    const filteredMessage = lastUserMessage
+      .split(' ')
+      .filter(word => {
+        const lowerWord = word.toLowerCase().replace(/[.,!?]/g, '');
+        return !commonNames.includes(lowerWord);
+      })
+      .join(' ');
+    
+    // Only use filtered message if it's significantly different (to avoid breaking normal conversation)
+    if (filteredMessage.length > lastUserMessage.length * 0.7) {
+      lastUserMessage = filteredMessage;
+    }
+
+    // Initialize supervisor
+    const supervisor = new SupervisorNode();
+
+    // Orchestrate with multi-agent system
+    let orchestrationResult;
+    try {
+      orchestrationResult = await supervisor.orchestrate(
+        lastUserMessage,
+        messages,
+        userId || '',
+        supabase
+      );
+    } catch (error) {
+      console.error('Supervisor error:', error);
+      orchestrationResult = { type: 'conversation', response: '', intent: 'conversation' };
+    }
+
+    // If agent handled it, return agent response
+    if (orchestrationResult.type !== 'conversation' && orchestrationResult.response) {
+      return new Response(
+        JSON.stringify({
+          response: orchestrationResult.response,
+          intent: orchestrationResult.intent,
+          data: orchestrationResult.data,
+          orderData: orchestrationResult.orderData,
+          requiresPayment: orchestrationResult.type === 'payment_required',
+        }),
+        {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        }
+      );
+    }
+
+    // Otherwise, use LLM for conversational responses
+    // Load user memory for context
+    let memoryContext = '';
+    if (userId) {
+      try {
+        const memory = await getUserMemory(userId, supabase);
+        if (memory.lastOrder) {
+          memoryContext += `\nUser's last order: ${JSON.stringify(memory.lastOrder)}`;
+        }
+        if (memory.defaultAddress) {
+          memoryContext += `\nDefault delivery address: ${memory.defaultAddress}`;
+        }
+        if (memory.restaurantPreferences.length > 0) {
+          memoryContext += `\nPreferred restaurants: ${memory.restaurantPreferences.map(r => r.restaurantName).join(', ')}`;
+        }
+      } catch (error) {
+        console.error('Error loading memory:', error);
+      }
+    }
+
+    // Fetch restaurants from database (single source of truth)
+    let restaurantList = '';
+    try {
+      const { data: restaurants } = await supabase
+        .from('restaurants')
+        .select('name, cuisine, rating, delivery_time')
+        .order('rating', { ascending: false })
+        .limit(20);
+      
+      if (restaurants && restaurants.length > 0) {
+        restaurantList = restaurants
+          .map((r, idx) => `${idx + 1}. ${r.name} (${r.cuisine}) - Rating ${r.rating} ⭐, ${r.delivery_time || '30-40 mins'} delivery`)
+          .join('\n');
+      } else {
+        restaurantList = 'No restaurants available at the moment.';
+      }
+    } catch (error) {
+      console.error('Error fetching restaurants:', error);
+      restaurantList = 'Unable to fetch restaurant list.';
+    }
 
     let systemPrompt = `You are a helpful AI food ordering assistant. You help users discover restaurants, understand menus, and place orders. 
 
@@ -65,24 +165,16 @@ Your capabilities:
 
 Keep responses conversational, friendly, and concise. When users ask about specific dishes or restaurants, provide clear information about availability, pricing, and preparation time.
 
-Available restaurants:
-1. Paradise Biryani (Hyderabadi) - Rating 4.6, 30-40 mins delivery
-2. Dominos Pizza (Italian) - Rating 4.2, 25-35 mins delivery
-3. Subway (American) - Rating 4.4, 20-30 mins delivery
-4. KFC (Fast Food) - Rating 4.3, 25-35 mins delivery
-5. Sushi Palace (Japanese) - Rating 4.7, 35-45 mins delivery
+IMPORTANT RULES:
+- NEVER infer user identity from message text. User identity comes from authentication only.
+- If a restaurant is mentioned but not found in the database, say: "[Restaurant Name] is listed, but menu/details are not yet available."
+- Only confirm orders after receiving a valid order ID from the backend.
+- Never assume order confirmation without backend verification.
 
-When users want to order, guide them through the process naturally.`;
+Available restaurants (from database):
+${restaurantList}
 
-    if (isOrderRequest) {
-      if (previousOrderRequests === 1) {
-        // First time asking to place order
-        systemPrompt += '\n\nIMPORTANT: The user is asking to place an order for the FIRST time in this conversation. Ask them what they would like to order, which restaurant they prefer, and what items they want. Do not assume they have already discussed items.';
-      } else if (previousOrderRequests > 1) {
-        // Subsequent order requests
-        systemPrompt += '\n\nIMPORTANT: The user has already discussed their order details in previous messages. Summarize what they mentioned and help them complete the order by confirming the items and restaurant. Guide them to use the cart feature in the dashboard.';
-      }
-    }
+When users want to order, guide them through the process naturally.${memoryContext}`;
 
     const response = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
       method: 'POST',
@@ -109,8 +201,11 @@ When users want to order, guide them through the process naturally.`;
     const assistantMessage = data.choices[0]?.message?.content || "I couldn't process that request.";
 
     return new Response(
-      JSON.stringify({ response: assistantMessage }),
-      { 
+      JSON.stringify({
+        response: assistantMessage,
+        intent: orchestrationResult.intent || 'conversation',
+      }),
+      {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       }
     );
