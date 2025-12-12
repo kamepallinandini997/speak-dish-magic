@@ -51,28 +51,14 @@ export const VoiceChat = ({ isActive }: VoiceChatProps) => {
 
   // Initialize speech recognition and load user data
   useEffect(() => {
-    // Initialize Web Speech API
+    // Initialize Web Speech API - setup only, handlers set in startListening
     if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
       const SpeechRecognition = (window as any).webkitSpeechRecognition || (window as any).SpeechRecognition;
       recognitionRef.current = new SpeechRecognition();
       recognitionRef.current.continuous = false;
-      recognitionRef.current.interimResults = false;
-
-      recognitionRef.current.onerror = (event: any) => {
-        console.error("Speech recognition error:", event.error);
-        setIsListening(false);
-        toast({
-          title: "Voice recognition error",
-          description: event.error === "not-allowed" 
-            ? "Microphone access denied. Please enable it in your browser settings."
-            : "Please try again or type your message",
-          variant: "destructive",
-        });
-      };
-
-      recognitionRef.current.onend = () => {
-        setIsListening(false);
-      };
+      recognitionRef.current.interimResults = true; // Show interim results for better UX
+      recognitionRef.current.lang = 'en-US';
+      recognitionRef.current.maxAlternatives = 1;
     }
 
     // Get current user and load sessions (only once)
@@ -345,70 +331,123 @@ export const VoiceChat = ({ isActive }: VoiceChatProps) => {
       return;
     }
 
-    // Initialize if not already
+    // If already listening, stop first
+    if (isListening && recognitionRef.current) {
+      try {
+        recognitionRef.current.stop();
+      } catch (e) {
+        // Ignore if already stopped
+      }
+      setIsListening(false);
+      return;
+    }
+
+    stopSpeaking();
+
+    // Request microphone permission first
+    try {
+      await navigator.mediaDevices.getUserMedia({ audio: true });
+    } catch (error: any) {
+      console.error("Microphone permission error:", error);
+      toast({
+        title: "Microphone access denied",
+        description: "Please allow microphone access in your browser settings to use voice input.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    // Initialize recognition if needed
     if (!recognitionRef.current) {
       const SpeechRecognition = (window as any).webkitSpeechRecognition || (window as any).SpeechRecognition;
       recognitionRef.current = new SpeechRecognition();
       recognitionRef.current.continuous = false;
-      recognitionRef.current.interimResults = false;
+      recognitionRef.current.interimResults = true;
       recognitionRef.current.lang = 'en-US';
-
-      recognitionRef.current.onerror = (event: any) => {
-        console.error("Speech recognition error:", event.error);
-        setIsListening(false);
-        
-        let description = "Please try again or type your message";
-        if (event.error === "not-allowed") {
-          description = "Microphone access denied. Please enable it in your browser settings.";
-        } else if (event.error === "no-speech") {
-          description = "No speech detected. Please speak clearly and try again.";
-        } else if (event.error === "network") {
-          description = "Network error. Please check your internet connection.";
-        } else if (event.error === "aborted") {
-          description = "Voice recognition was interrupted. Please try again.";
-        }
-        
-        toast({
-          title: "Voice recognition error",
-          description,
-          variant: "destructive",
-        });
-      };
-
-      recognitionRef.current.onend = () => {
-        setIsListening(false);
-      };
+      recognitionRef.current.maxAlternatives = 1;
     }
 
-    stopSpeaking();
-    
+    // Set up handlers
     recognitionRef.current.onresult = (event: any) => {
-      const transcript = event.results[0][0].transcript;
-      console.log("Speech recognized:", transcript);
-      setInputText(transcript); // Just set the text, don't send
+      let finalTranscript = '';
+      let interimTranscript = '';
+      
+      for (let i = event.resultIndex; i < event.results.length; i++) {
+        const transcript = event.results[i][0].transcript;
+        if (event.results[i].isFinal) {
+          finalTranscript += transcript;
+        } else {
+          interimTranscript += transcript;
+        }
+      }
+      
+      if (finalTranscript) {
+        console.log("Final speech recognized:", finalTranscript);
+        setInputText(finalTranscript);
+        toast({
+          title: "Voice captured",
+          description: "Press Send to submit your message",
+        });
+      } else if (interimTranscript) {
+        // Show interim results as user speaks
+        setInputText(interimTranscript);
+      }
+    };
+
+    recognitionRef.current.onerror = (event: any) => {
+      console.error("Speech recognition error:", event.error);
+      setIsListening(false);
+      
+      // Don't show error for aborted (user stopped) or no-speech (timeout)
+      if (event.error === 'aborted') {
+        return; // User clicked stop, no error needed
+      }
+      
+      let description = "Please try again or type your message";
+      if (event.error === "not-allowed") {
+        description = "Microphone access denied. Please enable it in your browser settings.";
+      } else if (event.error === "no-speech") {
+        description = "No speech detected. Please speak clearly and try again.";
+      } else if (event.error === "network") {
+        description = "Network error. Please check your internet connection.";
+      } else if (event.error === "audio-capture") {
+        description = "No microphone found. Please connect a microphone.";
+      } else if (event.error === "service-not-allowed") {
+        description = "Speech service not allowed. Please use HTTPS.";
+      }
+      
       toast({
-        title: "Voice captured",
-        description: "Press Send to submit your message",
+        title: "Voice recognition error",
+        description,
+        variant: "destructive",
       });
     };
-    
+
+    recognitionRef.current.onend = () => {
+      console.log("Speech recognition ended");
+      setIsListening(false);
+    };
+
+    // Start recognition
     try {
-      // Request microphone permission explicitly
-      await navigator.mediaDevices.getUserMedia({ audio: true });
-      
       setIsListening(true);
       recognitionRef.current.start();
-      console.log("Voice recognition started");
+      console.log("Voice recognition started successfully");
     } catch (error: any) {
       console.error("Error starting recognition:", error);
       setIsListening(false);
       
-      if (error.name === 'NotAllowedError' || error.name === 'PermissionDeniedError') {
-        toast({
-          title: "Microphone access denied",
-          description: "Please allow microphone access in your browser to use voice input.",
-          variant: "destructive",
-        });
+      // Handle "already started" error
+      if (error.message?.includes('already started')) {
+        try {
+          recognitionRef.current.stop();
+          setTimeout(() => {
+            recognitionRef.current?.start();
+            setIsListening(true);
+          }, 100);
+        } catch (e) {
+          console.error("Retry failed:", e);
+        }
       } else {
         toast({
           title: "Error",
@@ -417,7 +456,7 @@ export const VoiceChat = ({ isActive }: VoiceChatProps) => {
         });
       }
     }
-  }, [stopSpeaking, toast]);
+  }, [isListening, stopSpeaking, toast]);
 
   const stopListening = useCallback(() => {
     if (recognitionRef.current) {
