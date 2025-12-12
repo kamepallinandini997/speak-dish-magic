@@ -107,43 +107,67 @@ export type Database = {
       }
       menu_items: {
         Row: {
+          allergens: string[] | null
+          calories: number | null
+          carbs: number | null
           category: string | null
           created_at: string | null
           description: string | null
+          fat: number | null
           id: string
           image_url: string | null
+          ingredients: string[] | null
           is_available: boolean | null
           is_vegetarian: boolean | null
           name: string
           price: number
+          protein: number | null
           rating: number | null
           restaurant_id: string | null
+          spice_level: number | null
+          tags: string[] | null
         }
         Insert: {
+          allergens?: string[] | null
+          calories?: number | null
+          carbs?: number | null
           category?: string | null
           created_at?: string | null
           description?: string | null
+          fat?: number | null
           id?: string
           image_url?: string | null
+          ingredients?: string[] | null
           is_available?: boolean | null
           is_vegetarian?: boolean | null
           name: string
           price: number
+          protein?: number | null
           rating?: number | null
           restaurant_id?: string | null
+          spice_level?: number | null
+          tags?: string[] | null
         }
         Update: {
+          allergens?: string[] | null
+          calories?: number | null
+          carbs?: number | null
           category?: string | null
           created_at?: string | null
           description?: string | null
+          fat?: number | null
           id?: string
           image_url?: string | null
+          ingredients?: string[] | null
           is_available?: boolean | null
           is_vegetarian?: boolean | null
           name?: string
           price?: number
+          protein?: number | null
           rating?: number | null
           restaurant_id?: string | null
+          spice_level?: number | null
+          tags?: string[] | null
         }
         Relationships: [
           {
@@ -342,6 +366,66 @@ export type Database = {
           min_order?: number | null
           name?: string
           rating?: number | null
+        }
+        Relationships: []
+      }
+      user_memory: {
+        Row: {
+          created_at: string
+          id: string
+          memory_key: string
+          memory_type: string
+          memory_value: Json | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          memory_key: string
+          memory_type: string
+          memory_value?: Json | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          memory_key?: string
+          memory_type?: string
+          memory_value?: Json | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      user_preferences: {
+        Row: {
+          created_at: string
+          id: string
+          preference_key: string
+          preference_type: string
+          preference_value: Json | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          preference_key: string
+          preference_type: string
+          preference_value?: Json | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          preference_key?: string
+          preference_type?: string
+          preference_value?: Json | null
+          updated_at?: string
+          user_id?: string
         }
         Relationships: []
       }
