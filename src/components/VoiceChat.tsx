@@ -334,33 +334,88 @@ export const VoiceChat = ({ isActive }: VoiceChatProps) => {
   }, [voiceEnabled, stopSpeaking]);
 
   // Voice input - NO auto-submit, just populate text box
-  const startListening = useCallback(() => {
-    if (recognitionRef.current) {
-      stopSpeaking();
-      
-      recognitionRef.current.onresult = (event: any) => {
-        const transcript = event.results[0][0].transcript;
-        setInputText(transcript); // Just set the text, don't send
-      };
-      
-      try {
-        setIsListening(true);
-        recognitionRef.current.start();
-      } catch (error) {
-        console.error("Error starting recognition:", error);
+  const startListening = useCallback(async () => {
+    // Check if speech recognition is available
+    if (!('webkitSpeechRecognition' in window) && !('SpeechRecognition' in window)) {
+      toast({
+        title: "Voice not supported",
+        description: "Your browser doesn't support voice recognition. Try Chrome, Edge, or Safari.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    // Initialize if not already
+    if (!recognitionRef.current) {
+      const SpeechRecognition = (window as any).webkitSpeechRecognition || (window as any).SpeechRecognition;
+      recognitionRef.current = new SpeechRecognition();
+      recognitionRef.current.continuous = false;
+      recognitionRef.current.interimResults = false;
+      recognitionRef.current.lang = 'en-US';
+
+      recognitionRef.current.onerror = (event: any) => {
+        console.error("Speech recognition error:", event.error);
         setIsListening(false);
+        
+        let description = "Please try again or type your message";
+        if (event.error === "not-allowed") {
+          description = "Microphone access denied. Please enable it in your browser settings.";
+        } else if (event.error === "no-speech") {
+          description = "No speech detected. Please speak clearly and try again.";
+        } else if (event.error === "network") {
+          description = "Network error. Please check your internet connection.";
+        } else if (event.error === "aborted") {
+          description = "Voice recognition was interrupted. Please try again.";
+        }
+        
+        toast({
+          title: "Voice recognition error",
+          description,
+          variant: "destructive",
+        });
+      };
+
+      recognitionRef.current.onend = () => {
+        setIsListening(false);
+      };
+    }
+
+    stopSpeaking();
+    
+    recognitionRef.current.onresult = (event: any) => {
+      const transcript = event.results[0][0].transcript;
+      console.log("Speech recognized:", transcript);
+      setInputText(transcript); // Just set the text, don't send
+      toast({
+        title: "Voice captured",
+        description: "Press Send to submit your message",
+      });
+    };
+    
+    try {
+      // Request microphone permission explicitly
+      await navigator.mediaDevices.getUserMedia({ audio: true });
+      
+      setIsListening(true);
+      recognitionRef.current.start();
+      console.log("Voice recognition started");
+    } catch (error: any) {
+      console.error("Error starting recognition:", error);
+      setIsListening(false);
+      
+      if (error.name === 'NotAllowedError' || error.name === 'PermissionDeniedError') {
+        toast({
+          title: "Microphone access denied",
+          description: "Please allow microphone access in your browser to use voice input.",
+          variant: "destructive",
+        });
+      } else {
         toast({
           title: "Error",
           description: "Could not start voice recognition. Please try again.",
           variant: "destructive",
         });
       }
-    } else {
-      toast({
-        title: "Voice not supported",
-        description: "Your browser doesn't support voice recognition. Please type your message instead.",
-        variant: "destructive",
-      });
     }
   }, [stopSpeaking, toast]);
 
