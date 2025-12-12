@@ -69,7 +69,7 @@ serve(async (req) => {
     // (This is a simple filter - in production, use more sophisticated NLP)
     const filteredMessage = lastUserMessage
       .split(' ')
-      .filter(word => {
+      .filter((word: string) => {
         const lowerWord = word.toLowerCase().replace(/[.,!?]/g, '');
         return !commonNames.includes(lowerWord);
       })

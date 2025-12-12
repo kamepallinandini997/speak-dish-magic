@@ -225,7 +225,7 @@ export const ChatMessageArea = ({
           </div>
 
           <Button
-            onClick={onSendMessage}
+            onClick={() => onSendMessage()}
             disabled={!inputText.trim() || isProcessing}
             size="icon"
             className="flex-shrink-0 h-10 w-10 bg-gradient-to-r from-primary to-accent hover:opacity-90"
