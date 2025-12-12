@@ -5,8 +5,25 @@ interface Message {
   content: string;
 }
 
+// Expanded intent types for full food assistant
+type IntentType = 
+  // Ordering & Cart
+  | 'order' | 'add_to_cart' | 'modify_cart' | 'remove_from_cart' | 'reorder' | 'place_order' | 'cancel_order'
+  // Recommendations
+  | 'recommend' | 'suggest_by_taste' | 'suggest_by_budget' | 'trending' | 'healthy_options' | 'combos' | 'usuals'
+  // Taste/Profile
+  | 'save_preference' | 'get_usuals' | 'update_diet' | 'allergy_warning'
+  // Search/Discovery
+  | 'search_items' | 'filter_menu' | 'sort_menu' | 'compare_items' | 'compare_restaurants'
+  // Nutrition
+  | 'calories_lookup' | 'nutrition_info' | 'diet_check' | 'allergen_check'
+  // Utility
+  | 'delivery_time' | 'restaurant_info' | 'item_availability' | 'price_check' | 'cheapest' | 'highest_rated'
+  // General
+  | 'track' | 'cart' | 'wishlist' | 'query' | 'conversation' | 'clarify' | 'greeting' | 'help';
+
 interface IntentResult {
-  intent: 'order' | 'query' | 'track' | 'cart' | 'wishlist' | 'conversation' | 'clarify';
+  intent: IntentType;
   confidence: number;
   entities: {
     restaurant?: string;
@@ -16,21 +33,106 @@ interface IntentResult {
     action?: 'add' | 'remove' | 'update' | 'view' | 'clear';
     menuItemId?: string;
     quantity?: number;
+    // New entities for expanded intents
+    budget?: number;
+    category?: string;
+    cuisine?: string;
+    spiceLevel?: number;
+    isVegetarian?: boolean;
+    isHealthy?: boolean;
+    sortBy?: 'price' | 'rating' | 'calories' | 'name';
+    sortOrder?: 'asc' | 'desc';
+    compareItemIds?: string[];
+    compareRestaurantIds?: string[];
   };
 }
 
-// Intent Router Agent
+// Intent Router Agent - Expanded for full food assistant
 export function intentRouter(userMessage: string, conversationHistory: Message[]): IntentResult {
   const lowerMessage = userMessage.toLowerCase();
 
+  // Greeting intent
+  if (lowerMessage.match(/^(hi|hello|hey|good morning|good evening|good afternoon|namaste)/)) {
+    return { intent: 'greeting', confidence: 0.95, entities: {} };
+  }
+
+  // Help intent
+  if (lowerMessage.match(/(help|what can you do|how.*use|commands|features)/)) {
+    return { intent: 'help', confidence: 0.9, entities: {} };
+  }
+
+  // Usuals/Favorites intent
+  if (lowerMessage.match(/(my usuals|usual order|what.*usually order|my favorites|order.*usual|same as last time|reorder)/)) {
+    return { intent: 'usuals', confidence: 0.95, entities: {} };
+  }
+
+  // Recommendation intents
+  if (lowerMessage.match(/(recommend|suggest|what should i|ideas|something good|surprise me)/)) {
+    const entities = extractRecommendationEntities(lowerMessage);
+    
+    if (lowerMessage.match(/(healthy|low calorie|light|diet|fit)/)) {
+      return { intent: 'healthy_options', confidence: 0.9, entities };
+    }
+    if (lowerMessage.match(/(cheap|budget|under|less than|affordable|₹|rs)/)) {
+      return { intent: 'suggest_by_budget', confidence: 0.9, entities };
+    }
+    if (lowerMessage.match(/(trending|popular|best seller|most ordered)/)) {
+      return { intent: 'trending', confidence: 0.9, entities };
+    }
+    if (lowerMessage.match(/(combo|meal deal|complete meal|with drink)/)) {
+      return { intent: 'combos', confidence: 0.9, entities };
+    }
+    return { intent: 'recommend', confidence: 0.85, entities };
+  }
+
+  // Comparison intents
+  if (lowerMessage.match(/(compare|vs|versus|difference between|which is better)/)) {
+    if (lowerMessage.match(/(restaurant)/)) {
+      return { intent: 'compare_restaurants', confidence: 0.9, entities: {} };
+    }
+    return { intent: 'compare_items', confidence: 0.9, entities: {} };
+  }
+
+  // Nutrition intents
+  if (lowerMessage.match(/(calorie|calories|kcal|nutrition|nutritional|protein|carbs|fat)/)) {
+    return { intent: 'nutrition_info', confidence: 0.9, entities: {} };
+  }
+
+  if (lowerMessage.match(/(allergy|allergic|allergen|contain|ingredients)/)) {
+    return { intent: 'allergen_check', confidence: 0.9, entities: {} };
+  }
+
+  // Sorting intents
+  if (lowerMessage.match(/(sort|sorted|order by|arrange|cheapest|highest rated|lowest price)/)) {
+    const entities = extractSortEntities(lowerMessage);
+    if (lowerMessage.match(/cheapest/)) {
+      return { intent: 'cheapest', confidence: 0.9, entities };
+    }
+    if (lowerMessage.match(/(highest rated|top rated|best rated)/)) {
+      return { intent: 'highest_rated', confidence: 0.9, entities };
+    }
+    return { intent: 'sort_menu', confidence: 0.85, entities };
+  }
+
+  // Filter intents
+  if (lowerMessage.match(/(filter|show.*only|just.*show|veg only|non.?veg|spicy|mild)/)) {
+    const entities = extractFilterEntities(lowerMessage);
+    return { intent: 'filter_menu', confidence: 0.85, entities };
+  }
+
+  // Preference/Diet intents
+  if (lowerMessage.match(/(i don't like|i'm allergic|i prefer|my preference|i am vegan|i am vegetarian|save.*preference)/)) {
+    return { intent: 'save_preference', confidence: 0.9, entities: {} };
+  }
+
   // Order intent
-  if (lowerMessage.match(/(order|buy|purchase|place.*order|i want|i'd like|add.*to.*cart)/)) {
+  if (lowerMessage.match(/(order|buy|purchase|place.*order|i want|i'd like|add.*to.*cart|get me)/)) {
     const entities = extractOrderEntities(userMessage, conversationHistory);
     return { intent: 'order', confidence: 0.9, entities };
   }
 
   // Track intent
-  if (lowerMessage.match(/(track|where.*order|status|delivery|my order|order status)/)) {
+  if (lowerMessage.match(/(track|where.*order|status|delivery|my order|order status|eta|when.*arrive)/)) {
     const orderId = extractOrderId(userMessage, conversationHistory);
     return { intent: 'track', confidence: 0.9, entities: { orderId } };
   }
@@ -47,9 +149,15 @@ export function intentRouter(userMessage: string, conversationHistory: Message[]
     return { intent: 'wishlist', confidence: 0.8, entities: { action } };
   }
 
+  // Restaurant info intent
+  if (lowerMessage.match(/(delivery time|how long|delivery fee|minimum order|is.*open|restaurant hours)/)) {
+    return { intent: 'restaurant_info', confidence: 0.85, entities: {} };
+  }
+
   // Query intent (restaurant/menu questions)
-  if (lowerMessage.match(/(what|which|where|how|tell.*about|show.*menu|menu|restaurant|cuisine)/)) {
-    return { intent: 'query', confidence: 0.8, entities: {} };
+  if (lowerMessage.match(/(what|which|where|how|tell.*about|show.*menu|menu|restaurant|cuisine|find)/)) {
+    const entities = extractOrderEntities(userMessage, conversationHistory);
+    return { intent: 'query', confidence: 0.8, entities };
   }
 
   // Clarify intent (incomplete information)
@@ -58,6 +166,74 @@ export function intentRouter(userMessage: string, conversationHistory: Message[]
   }
 
   return { intent: 'conversation', confidence: 0.5, entities: {} };
+}
+
+// Extract recommendation-specific entities
+function extractRecommendationEntities(message: string): IntentResult['entities'] {
+  const entities: IntentResult['entities'] = {};
+
+  // Extract budget
+  const budgetMatch = message.match(/(?:under|below|less than|max|₹|rs\.?)\s*(\d+)/i);
+  if (budgetMatch) {
+    entities.budget = parseInt(budgetMatch[1]);
+  }
+
+  // Extract category
+  const categories = ['biryani', 'pizza', 'burger', 'chinese', 'indian', 'dessert', 'drinks', 'healthy'];
+  for (const cat of categories) {
+    if (message.includes(cat)) {
+      entities.category = cat;
+      break;
+    }
+  }
+
+  // Check dietary preferences
+  if (message.match(/veg(?:etarian)?(?!\s*non)/)) {
+    entities.isVegetarian = true;
+  }
+  if (message.match(/(healthy|low calorie|diet|light)/)) {
+    entities.isHealthy = true;
+  }
+
+  // Extract spice preference
+  if (message.includes('spicy')) entities.spiceLevel = 5;
+  else if (message.includes('mild')) entities.spiceLevel = 2;
+  else if (message.includes('medium spice')) entities.spiceLevel = 3;
+
+  return entities;
+}
+
+// Extract sorting entities
+function extractSortEntities(message: string): IntentResult['entities'] {
+  const entities: IntentResult['entities'] = {};
+
+  if (message.match(/price|cheap/)) entities.sortBy = 'price';
+  else if (message.match(/rating|rated/)) entities.sortBy = 'rating';
+  else if (message.match(/calorie/)) entities.sortBy = 'calories';
+  else if (message.match(/name|alphabetic/)) entities.sortBy = 'name';
+
+  entities.sortOrder = message.match(/(high|descending|most)/) ? 'desc' : 'asc';
+
+  return entities;
+}
+
+// Extract filter entities
+function extractFilterEntities(message: string): IntentResult['entities'] {
+  const entities: IntentResult['entities'] = {};
+
+  if (message.match(/non.?veg/)) entities.isVegetarian = false;
+  else if (message.match(/veg(?!.*non)/)) entities.isVegetarian = true;
+
+  if (message.includes('spicy')) entities.spiceLevel = 4;
+  if (message.includes('mild')) entities.spiceLevel = 2;
+
+  // Extract price range
+  const priceMatch = message.match(/under\s*(?:₹|rs\.?)?\s*(\d+)/i);
+  if (priceMatch) {
+    entities.budget = parseInt(priceMatch[1]);
+  }
+
+  return entities;
 }
 
 // Entity extraction functions
