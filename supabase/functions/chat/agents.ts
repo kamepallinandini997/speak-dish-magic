@@ -310,8 +310,8 @@ export async function dataFetchAgent(
                 // Word-by-word matching
                 const searchWords = searchLower.split(/\s+/).filter(w => w.length > 2);
                 const restaurantWords = restaurantNameLower.split(/\s+/);
-                const matchedWords = searchWords.filter(sw => 
-                  restaurantWords.some(rw => rw.includes(sw) || sw.includes(rw))
+                const matchedWords = searchWords.filter((sw: string) => 
+                  restaurantWords.some((rw: string) => rw.includes(sw) || sw.includes(rw))
                 ).length;
                 score += matchedWords * 2;
                 
@@ -357,34 +357,6 @@ export async function dataFetchAgent(
         // No restaurant specified
         return { restaurant: null, menuItems: [] };
       }
-
-        if (restaurants && restaurants.length > 0) {
-          const restaurant = restaurants[0];
-          const restaurantId = restaurant.id;
-          
-          // Check if restaurant has menu items
-          const { data: menuItems } = await supabase
-            .from('menu_items')
-            .select('*')
-            .eq('restaurant_id', restaurantId)
-            .eq('is_available', true);
-
-          return { 
-            restaurant, 
-            menuItems: menuItems || [],
-            hasMenu: (menuItems && menuItems.length > 0)
-          };
-        } else {
-          // Restaurant not found in database
-          return { 
-            restaurant: null, 
-            menuItems: [],
-            restaurantName: entities.restaurant,
-            notFound: true
-          };
-        }
-      }
-      return { restaurant: null, menuItems: [] };
 
     case 'track':
       return null; // Handled by deliveryAgent
@@ -502,8 +474,7 @@ export async function orderAgent(
       return {
         message: `Order placed successfully! Order #${order.id.slice(0, 8)}. You can track your order anytime by asking "Where is my order?"`,
         requiresPayment: false,
-        orderData: order,
-        orderId: order.id, // Include order ID for tracking
+        orderData: { ...order, orderId: order.id },
       };
 
     default:
